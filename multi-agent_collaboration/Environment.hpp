@@ -60,9 +60,41 @@ struct Action {
 	Agent_Id agent;
 };
 
+struct Joint_Action {
+	Joint_Action(std::vector<Action> actions) : actions(actions) {};
+
+	std::vector<Action> actions;
+};
+
+struct Agent {
+	Agent(Coordinate coordinate)
+		: coordinate(coordinate), item() {};
+	Agent(Coordinate coordinate, Ingredient item) 
+		: coordinate(coordinate), item(item) {};
+	Coordinate coordinate;
+	std::optional<Ingredient> item;
+	bool operator== (const Agent& other) const {
+		if (coordinate != other.coordinate) return false;
+		if (item != other.item) return false;
+		return true;
+	}
+	bool operator!= (const Agent& other) const {
+		return !(*this == other);
+	}
+	void clear_item() {
+		item = {};
+	}
+	void set_item(Ingredient item) {
+		this->item = item;
+	}
+	void move_to(Coordinate coordinate) {
+		this->coordinate = coordinate;
+	}
+};
+
 struct State {
 	std::map<Coordinate, Ingredient> items;
-	std::vector<Coordinate> agents;
+	std::vector<Agent> agents;
 	std::optional<Ingredient> get_ingredient_at_position(Coordinate coordinate) const {
 		auto it = items.find(coordinate);
 		if (it != items.end()) {
@@ -75,6 +107,9 @@ struct State {
 	bool contains_item(Ingredient ingredient) const {
 		for (const auto& item : items) {
 			if (item.second == ingredient) return true;
+		}
+		for (const auto& agent : agents) {
+			if (agent.item == ingredient) return true;
 		}
 		return false;
 	}
@@ -96,7 +131,11 @@ struct State {
 		}
 
 		for (const auto& agent : agents) {
-			hash += std::to_string(agent.first * 128 + agent.second);
+			hash += std::to_string(agent.coordinate.first * 128 + agent.coordinate.second);
+			if (agent.item.has_value()) {
+				hash += static_cast<char>(agent.item.value());
+			}
+			hash += "0";
 		}
 		return std::hash<std::string>()(hash);
 	}
@@ -138,7 +177,10 @@ public:
 	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
 	void act(State& state, const Action& action) const;
 	void act(State& state, const Action& action, Print_Level print_level) const;
+	void act(State& state, const Joint_Action& action) const;
+	void act(State& state, const Joint_Action& action, Print_Level print_level) const;
 	std::vector<Action> get_actions(const State& state, Agent_Id agent) const;
+	std::vector<Joint_Action> get_joint_actions(const State& state) const;
 	State load(const std::string& path);
 	void print_state() const;
 	void print_state(const State& state) const;
@@ -146,6 +188,8 @@ public:
 	std::vector<Recipe> get_possible_recipes(const State& state) const;
 	Ingredient get_goal() const;
 	bool is_done(const State& state) const;
+	size_t get_number_of_agents() const;
+	Joint_Action convert_to_joint_action(const Action& action, Agent_Id agent) const;
 
 private:
 	void load_map_line(State& state, size_t& line_counter, const std::string& line, size_t width);
@@ -153,6 +197,8 @@ private:
 	Ingredient goal_name_to_ingredient(const std::string& name) const;
 	std::optional<Ingredient> get_recipe(Ingredient ingredient1, Ingredient ingredient2) const;
 	const std::map<std::pair<Ingredient, Ingredient>, Ingredient>& get_recipes() const;
+	void check_collisions(const State& state, Joint_Action& joint_action) const;
+	Coordinate move(const Coordinate& coordinate, Direction direction) const;
 
 	size_t number_of_agents;
 	std::string goal_name;

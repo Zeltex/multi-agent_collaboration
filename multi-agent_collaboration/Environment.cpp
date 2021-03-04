@@ -24,31 +24,33 @@ bool Environment::is_cell_type(const Coordinate& coordinate, const Cell_Type& ty
 	return false;
 }
 
+void Environment::act(State& state, const Joint_Action& action) const {
+	return act(state, action, Print_Level::DEBUG);
+}
+
+void Environment::act(State& state, const Joint_Action& joint_action, Print_Level print_level) const {
+	auto temp_action = joint_action; // Need to modify the action, potentially take non-const as argument instead
+	check_collisions(state, temp_action);
+	for (const auto& action : temp_action.actions) {
+		act(state, action, print_level);
+	}
+}
+
 void Environment::act(State& state, const Action& action) const {
 	return act(state, action, Print_Level::DEBUG);
 }
 
 void Environment::act(State& state, const Action& action, Print_Level print_level) const {
-	Coordinate old_position = state.agents.at(action.agent.id);
-	Coordinate new_position = old_position;
-	switch (action.direction) {
-	case Direction::UP: new_position = { new_position.first, new_position.second - 1 }; break;
-	case Direction::RIGHT: new_position = { new_position.first + 1, new_position.second }; break;
-	case Direction::DOWN: new_position = { new_position.first, new_position.second + 1 }; break;
-	case Direction::LEFT: new_position = { new_position.first - 1, new_position.second }; break;
-	case Direction::NONE: return;
-	}
+	auto& agent = state.agents.at(action.agent.id);
+	Coordinate old_position = agent.coordinate;
+	Coordinate new_position = move(old_position, action.direction);	
 
-	auto item_old_position = state.get_ingredient_at_position(old_position);
+	auto item_old_position = agent.item;
 	auto item_new_position = state.get_ingredient_at_position(new_position);
 
 	// Simple move
 	if (!is_cell_type(new_position, Cell_Type::WALL)) {
-		state.agents.at(action.agent.id) = new_position;
-		if (item_old_position.has_value()) {
-			state.remove(old_position);
-			state.add(new_position, item_old_position.value());
-		}
+		state.agents.at(action.agent.id).move_to(new_position);
 		PRINT(print_level, std::string("Moved ") + static_cast<char>(action.direction));
 
 	// Goal condition
@@ -56,7 +58,7 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 		if (item_old_position.has_value()) {
 			auto recipe = get_recipe(Ingredient::DELIVERY, item_old_position.value());
 			if (recipe.has_value()) {
-				state.remove(old_position);
+				agent.clear_item();
 				state.add(new_position, recipe.value());
 				PRINT(print_level, std::string("goal ingredient delivered ") + static_cast<char>(recipe.value()));
 			}
@@ -67,14 +69,14 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 		auto recipe = get_recipe(item_old_position.value(), item_new_position.value());
 		if (recipe.has_value()) {
 			state.remove(new_position);
-			state.remove(old_position);
+			agent.clear_item();
 			state.add(new_position, recipe.value());
 			PRINT(print_level, std::string("Combine ") + static_cast<char>(recipe.value()));
 		} else {
 			auto recipe_reverse = get_recipe(item_new_position.value(), item_old_position.value());
 			if (recipe_reverse.has_value()) {
 				state.remove(new_position);
-				state.remove(old_position);
+				agent.clear_item();
 				state.add(new_position, recipe_reverse.value());
 				PRINT(print_level, std::string("Combine ") + static_cast<char>(recipe_reverse.value()));
 			}
@@ -90,21 +92,21 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 			PRINT(print_level, std::string("chop chop ") + static_cast<char>(recipe.value()));
 		} else if (!item_old_position.has_value()){
 			state.remove(new_position);
-			state.add(old_position, item_new_position.value());
+			agent.set_item(item_new_position.value());
 			PRINT(print_level, std::string("pickup"));
 		}
 
 
 	// Place
 	} else if (item_old_position.has_value()) {
-		state.remove(old_position);
+		agent.clear_item();
 		state.add(new_position, item_old_position.value());
 		PRINT(print_level, std::string("place ") + static_cast<char>(item_old_position.value()));
 
 	// Pickup
 	} else if (item_new_position.has_value()) {
 		state.remove(new_position);
-		state.add(old_position, item_new_position.value());
+		agent.set_item(item_new_position.value());
 		PRINT(print_level, std::string("pickup ") + static_cast<char>(item_new_position.value()));
 	} else {
 		// They are simply humping a wall
@@ -112,8 +114,73 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 	}
 }
 
+// This collision check is basically a one to one from the BD, but I believe it allows two agents to collide if one is no'opping, need to check this
+// UPDATE: the original code did allow collision with stationary agents, changed it to disallow this even though I believe that BD allows it
+void Environment::check_collisions(const State& state, Joint_Action& joint_action) const {
+	std::vector<Coordinate> current_coordinates;
+	std::vector<Coordinate> next_coordinates;
+	
+	for (size_t agent = 0; agent < joint_action.actions.size(); ++agent) {
+		current_coordinates.push_back(state.agents.at(agent).coordinate);
+		next_coordinates.push_back(move(state.agents.at(agent).coordinate, joint_action.actions.at(agent).direction));
+	}
+
+	for (size_t agent1 = 0; agent1 < joint_action.actions.size(); ++agent1) {
+		for (size_t agent2 = agent1+1; agent2 < joint_action.actions.size(); ++agent2) {
+			if (next_coordinates.at(agent1) == next_coordinates.at(agent2)) {
+				
+				// Agent1 still, agent2 invalid
+				if (current_coordinates.at(agent1) == next_coordinates.at(agent1)) {//&& joint_action.actions.at(agent1).direction != Direction::NONE) {
+					joint_action.actions.at(agent2).direction = Direction::NONE;
+
+				// Agent2 still, agent1 invalid
+				} else if (current_coordinates.at(agent2) == next_coordinates.at(agent2)){// && joint_action.actions.at(agent2).direction != Direction::NONE) {
+					joint_action.actions.at(agent1).direction = Direction::NONE;
+				} else {
+					joint_action.actions.at(agent1).direction = Direction::NONE;
+					joint_action.actions.at(agent2).direction = Direction::NONE;
+				}
+			// Swap (invalid)
+			} else if (current_coordinates.at(agent1) == next_coordinates.at(agent2) 
+				&& current_coordinates.at(agent2) == next_coordinates.at(agent1)) {
+				joint_action.actions.at(agent1).direction = Direction::NONE;
+				joint_action.actions.at(agent2).direction = Direction::NONE;
+			}
+		}
+	}
+
+}
+
 std::vector<Action> Environment::get_actions(const State& state, Agent_Id agent) const {
 	return { {Direction::UP, agent}, {Direction::RIGHT, agent}, {Direction::DOWN, agent}, {Direction::LEFT, agent} };
+}
+
+std::vector<Joint_Action> Environment::get_joint_actions(const State& state) const {
+	std::vector<std::vector<Action>> single_actions;
+	std::vector<size_t> counters;
+	for (size_t agent = 0; agent < number_of_agents; ++agent) {
+		single_actions.push_back(get_actions(state, agent));
+		counters.emplace_back(0);
+	}
+
+	std::vector<Joint_Action> joint_actions;
+
+	bool done = false;
+	while (!done) {
+		std::vector<Action> actions;
+		for (size_t i = 0; i < counters.size(); i++) {
+			actions.push_back(single_actions[i][counters[i]]);
+		}
+		joint_actions.push_back(std::move(actions));
+
+		// Advance indices
+		size_t index = 0;
+		while (!done && ++counters.at(index) >= single_actions.at(index).size()) {
+			counters.at(index++) = 0;
+			done = index >= counters.size();
+		}
+	}
+	return joint_actions;
 }
 
 State Environment::load(const std::string& path) {
@@ -217,15 +284,20 @@ void Environment::print_state(const State& state) const {
 	std::string buffer;
 	for (size_t y = 0; y < walls.size(); ++y) {
 		for (size_t x = 0; x < walls.at(0).size(); ++x) {
-			auto agent_it = std::find(state.agents.begin(), state.agents.end(), Coordinate{ x, y });
+			auto agent_it = std::find_if(state.agents.begin(), state.agents.end(), [x, y](Agent agent)->bool {return agent.coordinate == Coordinate{x, y}; });
+			//auto agent_it = std::find_if(state.agents.begin(), state.agents.end(), Coordinate{ x, y }, [x, y](Agent agent)->bool {return agent.coordinate == {x, y}; });
 
 			if (state.items.find({ x, y }) != state.items.end()) {
 				buffer += static_cast<char>(state.items.at({ x, y }));
 
 			} else if (agent_it != state.agents.end()) {
-				char buf[2];
-				_itoa_s(std::distance(state.agents.begin(), agent_it), buf, 10);
-				buffer += buf[0];
+				if (agent_it->item.has_value()) {
+					buffer += static_cast<char>(agent_it->item.value());
+				} else {
+					char buf[2];
+					_itoa_s(std::distance(state.agents.begin(), agent_it), buf, 10);
+					buffer += buf[0];
+				}
 			
 			} else if (std::find(cutting_stations.begin(), cutting_stations.end(), Coordinate{ x, y }) != cutting_stations.end()) {
 				buffer += static_cast<char>(Cell_Type::CUTTING_STATION);
@@ -249,20 +321,37 @@ void Environment::print_state(const State& state) const {
 void Environment::play(State& state) const {
 	bool done = false;
 	Agent_Id agent = 0;
-	std::cout << "type {w, a, s, d} to move, {0-9} to switch agent, and {q} to quit" << std::endl;
+	std::cout << "type {w, a, s, d} to move single agent, {w, a, s, d, n}* to move multiple agents, {0-9} to switch single agent, and {q} to quit" << std::endl;
 	for (std::string line; std::getline(std::cin, line) && !done;) {
 		char c = line[0];
-		switch (c) {
-		case 'q': done = true; break;
-		case 'w': act(state, { Direction::UP, agent }); break;
-		case 'a': act(state, { Direction::LEFT, agent }); break;
-		case 's': act(state, { Direction::DOWN, agent }); break;
-		case 'd': act(state, { Direction::RIGHT, agent }); break;
-		}
 		if (c >= '0' && c <= '9') {
 			agent = { static_cast<size_t>(atoi(&c)) };
 			PRINT(Print_Level::DEBUG, std::string("Switcharoo ") + c);
+		} else {
+
+			std::vector<Action> actions;
+			for (size_t i = 0; i < number_of_agents; ++i) {
+				actions.push_back({ Direction::NONE, i });
+			}
+
+			for (size_t i = 0; i < line.size(); ++i) {
+				Direction dir = Direction::NONE;
+				switch (line.at(i)) {
+				case 'q': done = true; break;
+				case 'w': dir = Direction::UP; break;
+				case 'a': dir = Direction::LEFT; break;
+				case 's': dir = Direction::DOWN; break;
+				case 'd': dir = Direction::RIGHT; break;
+				}
+				if (line.size() > 1) {
+					actions.at(i).direction = dir;
+				} else {
+					actions.at(agent.id).direction = dir;
+				}
+			}
+			act(state, { actions });
 		}
+
 		print_state(state);
 	}
 }
@@ -327,4 +416,31 @@ Ingredient Environment::get_goal() const {
 
 bool Environment::is_done(const State& state) const {
 	return state.contains_item(goal_ingredient);
+}
+
+Coordinate Environment::move(const Coordinate& coordinate, Direction direction) const {
+	switch (direction) {
+	case Direction::UP: return { coordinate.first, coordinate.second - 1 };
+	case Direction::RIGHT: return { coordinate.first + 1, coordinate.second }; 
+	case Direction::DOWN: return { coordinate.first, coordinate.second + 1 }; 
+	case Direction::LEFT: return { coordinate.first - 1, coordinate.second }; 
+	default: return coordinate;
+	}
+}
+
+size_t Environment::get_number_of_agents() const {
+	return number_of_agents;
+}
+
+
+Joint_Action Environment::convert_to_joint_action(const Action& action, Agent_Id agent) const {
+	std::vector<Action> actions;
+	for (size_t i = 0; i < number_of_agents; ++i) {
+		if (i == agent.id) {
+			actions.push_back(action);
+		} else {
+			actions.push_back({ Direction::NONE, {i} });
+		}
+	}
+	return { actions };
 }

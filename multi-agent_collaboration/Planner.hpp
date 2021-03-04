@@ -5,7 +5,7 @@
 class Planner {
 public:
 	Planner(Environment environment, Agent_Id agent) : agent(agent), environment(environment) {};
-	Action get_next_action(const State& state);
+	Joint_Action get_next_action(const State& state);
 
 private:
 	Agent_Id agent;
