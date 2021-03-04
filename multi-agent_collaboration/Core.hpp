@@ -2,7 +2,8 @@
 #include <string>
 
 enum class Print_Level {
-	DEBUG=0,
+	NOPE=0,
+	DEBUG,
 	RELEASE
 };
 

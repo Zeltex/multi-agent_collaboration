@@ -1,6 +1,8 @@
 *.sln
 Debug/
+Release/
 .vs/
 */Debug
+*/Release
 */Release
 */*.vcxproj*

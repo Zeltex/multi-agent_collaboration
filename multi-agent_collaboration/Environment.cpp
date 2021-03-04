@@ -24,8 +24,11 @@ bool Environment::is_cell_type(const Coordinate& coordinate, const Cell_Type& ty
 	return false;
 }
 
-// TODO - Need to finish act
 void Environment::act(State& state, const Action& action) const {
+	return act(state, action, Print_Level::DEBUG);
+}
+
+void Environment::act(State& state, const Action& action, Print_Level print_level) const {
 	Coordinate old_position = state.agents.at(action.agent.id);
 	Coordinate new_position = old_position;
 	switch (action.direction) {
@@ -33,6 +36,7 @@ void Environment::act(State& state, const Action& action) const {
 	case Direction::RIGHT: new_position = { new_position.first + 1, new_position.second }; break;
 	case Direction::DOWN: new_position = { new_position.first, new_position.second + 1 }; break;
 	case Direction::LEFT: new_position = { new_position.first - 1, new_position.second }; break;
+	case Direction::NONE: return;
 	}
 
 	auto item_old_position = state.get_ingredient_at_position(old_position);
@@ -45,16 +49,17 @@ void Environment::act(State& state, const Action& action) const {
 			state.remove(old_position);
 			state.add(new_position, item_old_position.value());
 		}
-		PRINT(Print_Level::DEBUG, std::string("Moved ") + static_cast<char>(action.direction));
+		PRINT(print_level, std::string("Moved ") + static_cast<char>(action.direction));
 
 	// Goal condition
 	} else if (is_cell_type(new_position, Cell_Type::DELIVERY_STATION)) {
-		if (item_old_position.has_value() && item_old_position == goal_ingredient) {
-			state.remove(old_position);
-			state.add(new_position, item_old_position.value());
-			PRINT(Print_Level::DEBUG, std::string("goal ingredient delivered ") + static_cast<char>(item_old_position.value()));
-		} else {
-			return;
+		if (item_old_position.has_value()) {
+			auto recipe = get_recipe(Ingredient::DELIVERY, item_old_position.value());
+			if (recipe.has_value()) {
+				state.remove(old_position);
+				state.add(new_position, recipe.value());
+				PRINT(print_level, std::string("goal ingredient delivered ") + static_cast<char>(recipe.value()));
+			}
 		}
 
 	// Combine
@@ -64,14 +69,14 @@ void Environment::act(State& state, const Action& action) const {
 			state.remove(new_position);
 			state.remove(old_position);
 			state.add(new_position, recipe.value());
-			PRINT(Print_Level::DEBUG, std::string("Combine ") + static_cast<char>(recipe.value()));
+			PRINT(print_level, std::string("Combine ") + static_cast<char>(recipe.value()));
 		} else {
 			auto recipe_reverse = get_recipe(item_new_position.value(), item_old_position.value());
 			if (recipe_reverse.has_value()) {
 				state.remove(new_position);
 				state.remove(old_position);
 				state.add(new_position, recipe_reverse.value());
-				PRINT(Print_Level::DEBUG, std::string("Combine ") + static_cast<char>(recipe_reverse.value()));
+				PRINT(print_level, std::string("Combine ") + static_cast<char>(recipe_reverse.value()));
 			}
 		}
 
@@ -82,11 +87,11 @@ void Environment::act(State& state, const Action& action) const {
 		if (recipe.has_value()) {
 			state.remove(new_position);
 			state.add(new_position, recipe.value());
-			PRINT(Print_Level::DEBUG, std::string("chop chop ") + static_cast<char>(recipe.value()));
+			PRINT(print_level, std::string("chop chop ") + static_cast<char>(recipe.value()));
 		} else if (!item_old_position.has_value()){
 			state.remove(new_position);
 			state.add(old_position, item_new_position.value());
-			PRINT(Print_Level::DEBUG, std::string("pickup"));
+			PRINT(print_level, std::string("pickup"));
 		}
 
 
@@ -94,20 +99,21 @@ void Environment::act(State& state, const Action& action) const {
 	} else if (item_old_position.has_value()) {
 		state.remove(old_position);
 		state.add(new_position, item_old_position.value());
-		PRINT(Print_Level::DEBUG, std::string("place ") + static_cast<char>(item_old_position.value()));
+		PRINT(print_level, std::string("place ") + static_cast<char>(item_old_position.value()));
 
 	// Pickup
 	} else if (item_new_position.has_value()) {
 		state.remove(new_position);
 		state.add(old_position, item_new_position.value());
-		PRINT(Print_Level::DEBUG, std::string("pickup ") + static_cast<char>(item_new_position.value()));
+		PRINT(print_level, std::string("pickup ") + static_cast<char>(item_new_position.value()));
 	} else {
 		// They are simply humping a wall
+		PRINT(print_level, std::string("Nothing happened"));
 	}
 }
 
-std::vector<Action> Environment::get_actions(const State& state) const {
-	return {};
+std::vector<Action> Environment::get_actions(const State& state, Agent_Id agent) const {
+	return { {Direction::UP, agent}, {Direction::RIGHT, agent}, {Direction::DOWN, agent}, {Direction::LEFT, agent} };
 }
 
 State Environment::load(const std::string& path) {
@@ -263,31 +269,62 @@ void Environment::play(State& state) const {
 
 Ingredient Environment::goal_name_to_ingredient(const std::string& name) const {
 	if (name == "Salad") {
-		return Ingredient::PLATED_SALAD;
+		return Ingredient::DELIVERED_SALAD;
 	} else {
 		std::cerr << "Unknown goal ingredient " << name << std::endl;
 		exit(-1);
 	}
 }
 
+const std::map<std::pair<Ingredient, Ingredient>, Ingredient>& Environment::get_recipes() const {
+	static const std::map<std::pair<Ingredient, Ingredient>, Ingredient> recipes = {
+	{ {Ingredient::CUTTING, Ingredient::TOMATO}, Ingredient::CHOPPED_TOMATO},
+	{ {Ingredient::CUTTING, Ingredient::LETTUCE}, Ingredient::CHOPPED_LETTUCE},
+
+	{ {Ingredient::PLATE, Ingredient::CHOPPED_LETTUCE}, Ingredient::PLATED_LETTUCE},
+	{ {Ingredient::PLATE, Ingredient::CHOPPED_TOMATO}, Ingredient::PLATED_TOMATO},
+	{ {Ingredient::PLATE, Ingredient::SALAD}, Ingredient::PLATED_SALAD},
+
+	{ {Ingredient::CHOPPED_LETTUCE, Ingredient::CHOPPED_TOMATO}, Ingredient::SALAD},
+	{ {Ingredient::PLATED_LETTUCE, Ingredient::CHOPPED_TOMATO}, Ingredient::PLATED_SALAD},
+	{ {Ingredient::PLATED_TOMATO, Ingredient::CHOPPED_LETTUCE}, Ingredient::PLATED_SALAD},
+
+	{ {Ingredient::DELIVERY, Ingredient::PLATED_SALAD}, Ingredient::DELIVERED_SALAD},
+	};
+	return recipes;
+}
+
 // Not a great way to define recipes, but functional for now
 std::optional<Ingredient> Environment::get_recipe(Ingredient ingredient1, Ingredient ingredient2) const {
-	static const std::map<std::pair<Ingredient, Ingredient>, Ingredient> recipes = {
-		{ {Ingredient::CUTTING, Ingredient::TOMATO}, Ingredient::CHOPPED_TOMATO},
-		{ {Ingredient::CUTTING, Ingredient::LETTUCE}, Ingredient::CHOPPED_LETTUCE},
-
-		{ {Ingredient::PLATE, Ingredient::CHOPPED_LETTUCE}, Ingredient::PLATED_LETTUCE},
-		{ {Ingredient::PLATE, Ingredient::CHOPPED_TOMATO}, Ingredient::PLATED_TOMATO},
-		{ {Ingredient::PLATE, Ingredient::SALAD}, Ingredient::PLATED_SALAD},
-
-		{ {Ingredient::CHOPPED_LETTUCE, Ingredient::CHOPPED_TOMATO}, Ingredient::SALAD},
-		{ {Ingredient::PLATED_LETTUCE, Ingredient::CHOPPED_TOMATO}, Ingredient::PLATED_SALAD},
-		{ {Ingredient::PLATED_TOMATO, Ingredient::CHOPPED_LETTUCE}, Ingredient::PLATED_SALAD},
-	};
+	auto& recipes = get_recipes();
 	auto recipe_it = recipes.find({ ingredient1, ingredient2 });
 	if (recipe_it != recipes.end()) {
 		return recipe_it->second;
 	} else {
 		return {};
 	}
+}
+
+
+std::vector<Recipe> Environment::get_possible_recipes(const State& state) const {
+	auto& recipes = get_recipes();
+	std::vector<Recipe> possible_recipes;
+
+	for (const auto& recipe : recipes) {
+		auto& ingredients = recipe.first;
+
+		// TODO - Should handle cutting/delivery stations in a little less hardcoded way
+		if ((state.contains_item(ingredients.first) || ingredients.first == Ingredient::CUTTING || ingredients.first == Ingredient::DELIVERY) && state.contains_item(ingredients.second)) {
+			possible_recipes.push_back({ ingredients.first, ingredients.second, recipe.second });
+		}
+	}
+	return possible_recipes;
+}
+
+Ingredient Environment::get_goal() const {
+	return goal_ingredient;
+}
+
+bool Environment::is_done(const State& state) const {
+	return state.contains_item(goal_ingredient);
 }
