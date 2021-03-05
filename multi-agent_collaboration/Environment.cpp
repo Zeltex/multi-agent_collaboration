@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <set>
 
 bool Environment::is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const {
 	switch (type) {
@@ -43,7 +44,7 @@ void Environment::act(State& state, const Action& action) const {
 void Environment::act(State& state, const Action& action, Print_Level print_level) const {
 	auto& agent = state.agents.at(action.agent.id);
 	Coordinate old_position = agent.coordinate;
-	Coordinate new_position = move(old_position, action.direction);	
+	Coordinate new_position = move_noclip(old_position, action.direction);	
 
 	auto item_old_position = agent.item;
 	auto item_new_position = state.get_ingredient_at_position(new_position);
@@ -116,13 +117,20 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 
 // This collision check is basically a one to one from the BD, but I believe it allows two agents to collide if one is no'opping, need to check this
 // UPDATE: the original code did allow collision with stationary agents, changed it to disallow this even though I believe that BD allows it
+
+
+// TODO - Need to handle two agents accessing the same counter. Doesn't handle this after move change
 void Environment::check_collisions(const State& state, Joint_Action& joint_action) const {
 	std::vector<Coordinate> current_coordinates;
 	std::vector<Coordinate> next_coordinates;
+	std::vector<Coordinate> action_coordinates;
+
+	std::set<size_t> cancelled_agents;
 	
 	for (size_t agent = 0; agent < joint_action.actions.size(); ++agent) {
 		current_coordinates.push_back(state.agents.at(agent).coordinate);
 		next_coordinates.push_back(move(state.agents.at(agent).coordinate, joint_action.actions.at(agent).direction));
+		action_coordinates.push_back(move_noclip(state.agents.at(agent).coordinate, joint_action.actions.at(agent).direction));
 	}
 
 	for (size_t agent1 = 0; agent1 < joint_action.actions.size(); ++agent1) {
@@ -131,22 +139,31 @@ void Environment::check_collisions(const State& state, Joint_Action& joint_actio
 				
 				// Agent1 still, agent2 invalid
 				if (current_coordinates.at(agent1) == next_coordinates.at(agent1)) {//&& joint_action.actions.at(agent1).direction != Direction::NONE) {
-					joint_action.actions.at(agent2).direction = Direction::NONE;
+					cancelled_agents.insert(agent2);
 
 				// Agent2 still, agent1 invalid
 				} else if (current_coordinates.at(agent2) == next_coordinates.at(agent2)){// && joint_action.actions.at(agent2).direction != Direction::NONE) {
-					joint_action.actions.at(agent1).direction = Direction::NONE;
+					cancelled_agents.insert(agent1);
 				} else {
-					joint_action.actions.at(agent1).direction = Direction::NONE;
-					joint_action.actions.at(agent2).direction = Direction::NONE;
+					cancelled_agents.insert(agent1);
+					cancelled_agents.insert(agent2);
 				}
 			// Swap (invalid)
 			} else if (current_coordinates.at(agent1) == next_coordinates.at(agent2) 
 				&& current_coordinates.at(agent2) == next_coordinates.at(agent1)) {
-				joint_action.actions.at(agent1).direction = Direction::NONE;
-				joint_action.actions.at(agent2).direction = Direction::NONE;
+				cancelled_agents.insert(agent1);
+				cancelled_agents.insert(agent2);
+
+			// Accessing same counter space
+			} else if (action_coordinates.at(agent1) == action_coordinates.at(agent2)) {
+				cancelled_agents.insert(agent1);
+				cancelled_agents.insert(agent2);
 			}
 		}
+	}
+
+	for (const auto& agent : cancelled_agents) {
+		joint_action.actions.at(agent).direction = Direction::NONE;
 	}
 
 }
@@ -419,11 +436,27 @@ bool Environment::is_done(const State& state) const {
 }
 
 Coordinate Environment::move(const Coordinate& coordinate, Direction direction) const {
+	Coordinate new_coordinate = coordinate;
 	switch (direction) {
-	case Direction::UP: return { coordinate.first, coordinate.second - 1 };
-	case Direction::RIGHT: return { coordinate.first + 1, coordinate.second }; 
-	case Direction::DOWN: return { coordinate.first, coordinate.second + 1 }; 
-	case Direction::LEFT: return { coordinate.first - 1, coordinate.second }; 
+	case Direction::UP:		new_coordinate = { coordinate.first, coordinate.second - 1 }; break;
+	case Direction::RIGHT:	new_coordinate = { coordinate.first + 1, coordinate.second }; break; 
+	case Direction::DOWN:	new_coordinate = { coordinate.first, coordinate.second + 1 }; break; 
+	case Direction::LEFT:	new_coordinate = { coordinate.first - 1, coordinate.second }; break; 
+	default: return coordinate;
+	}
+	if (walls.at(new_coordinate.first).at(new_coordinate.second)) {
+		return coordinate;
+	} else {
+		return new_coordinate;
+	}
+}
+
+Coordinate Environment::move_noclip(const Coordinate& coordinate, Direction direction) const {
+	switch (direction) {
+	case Direction::UP:		return { coordinate.first, coordinate.second - 1 };
+	case Direction::RIGHT:	return { coordinate.first + 1, coordinate.second };
+	case Direction::DOWN:	return { coordinate.first, coordinate.second + 1 };
+	case Direction::LEFT:	return { coordinate.first - 1, coordinate.second };
 	default: return coordinate;
 	}
 }
@@ -443,4 +476,12 @@ Joint_Action Environment::convert_to_joint_action(const Action& action, Agent_Id
 		}
 	}
 	return { actions };
+}
+
+std::vector<Coordinate> Environment::get_locations(const State& state, Ingredient ingredient) const {
+	switch (ingredient) {
+	case Ingredient::CUTTING: return cutting_stations;
+	case Ingredient::DELIVERY: return delivery_stations;
+	default: return state.get_locations(ingredient);
+	}
 }

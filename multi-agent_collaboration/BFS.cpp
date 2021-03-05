@@ -1,4 +1,5 @@
 #include "BFS.hpp"
+#include "Search.hpp"
 
 #include <unordered_set>
 #include <queue>

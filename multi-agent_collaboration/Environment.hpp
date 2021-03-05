@@ -153,6 +153,21 @@ struct State {
 		}
 		return true;
 	}
+
+	std::vector<Coordinate> get_locations(Ingredient ingredient) const {
+		std::vector<Coordinate> result;
+		for (const auto& item : items) {
+			if (item.second == ingredient) {
+				result.push_back(item.first);
+			}
+		}
+		for (const auto& agent : agents) {
+			if (agent.item == ingredient) {
+				result.push_back(agent.coordinate);
+			}
+		}
+		return result;
+	}
 };
 
 namespace std {
@@ -190,6 +205,7 @@ public:
 	bool is_done(const State& state) const;
 	size_t get_number_of_agents() const;
 	Joint_Action convert_to_joint_action(const Action& action, Agent_Id agent) const;
+	std::vector<Coordinate> get_locations(const State& state, Ingredient ingredient) const;
 
 private:
 	void load_map_line(State& state, size_t& line_counter, const std::string& line, size_t width);
@@ -199,6 +215,7 @@ private:
 	const std::map<std::pair<Ingredient, Ingredient>, Ingredient>& get_recipes() const;
 	void check_collisions(const State& state, Joint_Action& joint_action) const;
 	Coordinate move(const Coordinate& coordinate, Direction direction) const;
+	Coordinate move_noclip(const Coordinate& coordinate, Direction direction) const;
 
 	size_t number_of_agents;
 	std::string goal_name;
