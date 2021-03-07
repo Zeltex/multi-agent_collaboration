@@ -117,9 +117,6 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 
 // This collision check is basically a one to one from the BD, but I believe it allows two agents to collide if one is no'opping, need to check this
 // UPDATE: the original code did allow collision with stationary agents, changed it to disallow this even though I believe that BD allows it
-
-
-// TODO - Need to handle two agents accessing the same counter. Doesn't handle this after move change
 void Environment::check_collisions(const State& state, Joint_Action& joint_action) const {
 	std::vector<Coordinate> current_coordinates;
 	std::vector<Coordinate> next_coordinates;

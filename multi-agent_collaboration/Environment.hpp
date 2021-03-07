@@ -64,6 +64,17 @@ struct Joint_Action {
 	Joint_Action(std::vector<Action> actions) : actions(actions) {};
 
 	std::vector<Action> actions;
+	
+	// TODO - I believe actions are ordered by agent, and therefore the agent id is 
+	// not needed in the actions, or this function, but need to verify
+	void update_action(size_t agent, Direction direction) {
+		for (auto& action : actions) {
+			if (action.agent.id == agent) {
+				action.direction = direction;
+				return;
+			}
+		}
+	}
 };
 
 struct Agent {

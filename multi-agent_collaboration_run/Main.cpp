@@ -3,11 +3,11 @@
 #include "Planner.hpp"
 #include <iostream>
 #include <chrono>
+#include <ranges>
 
 #define PLAY 0
 
 int main(int argc, char* argv[]) {
-
 	auto environment = Environment(2);
 
 	auto state = environment.load("../levels/BD/partial-divider_salad.txt");
