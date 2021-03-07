@@ -45,14 +45,14 @@ struct Node_Comparator {
 		return lhs.f() > rhs.f() || (lhs.f() == rhs.f() && lhs.g > rhs.g);
 	}
 };
-
+#define INFINITE_HEURISTIC_DISTANCE 1000
 struct Heuristic {
 	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2)
 		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2) {};
 	size_t operator()(const State& state) {
 		auto locations1 = environment.get_locations(state, ingredient1);
 		auto locations2 = environment.get_locations(state, ingredient2);
-		size_t min_dist = (size_t)-1;
+		size_t min_dist = INFINITE_HEURISTIC_DISTANCE;
 		for (const auto& location1 : locations1) {
 			for (const auto& location2 : locations2) {
 				min_dist = std::min(min_dist, (size_t)std::abs((int)location1.first - (int)location2.first) + std::abs((int)location1.second - (int)location2.second));
