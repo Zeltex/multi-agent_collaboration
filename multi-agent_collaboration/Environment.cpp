@@ -60,7 +60,7 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 			auto recipe = get_recipe(Ingredient::DELIVERY, item_old_position.value());
 			if (recipe.has_value()) {
 				agent.clear_item();
-				state.add(new_position, recipe.value());
+				state.add_goal_item(new_position, recipe.value());
 				PRINT(print_level, std::string("goal ingredient delivered ") + static_cast<char>(recipe.value()));
 			}
 		}
@@ -166,9 +166,11 @@ void Environment::check_collisions(const State& state, Joint_Action& joint_actio
 }
 
 std::vector<Action> Environment::get_actions(const State& state, Agent_Id agent) const {
-	return { {Direction::UP, agent}, {Direction::RIGHT, agent}, {Direction::DOWN, agent}, {Direction::LEFT, agent} };
+	return { {Direction::UP, agent}, {Direction::RIGHT, agent}, {Direction::DOWN, agent}, {Direction::LEFT, agent}, {Direction::NONE, agent} };
 }
 
+
+#define NONE_INDEX 4
 std::vector<Joint_Action> Environment::get_joint_actions(const State& state) const {
 	std::vector<std::vector<Action>> single_actions;
 	std::vector<size_t> counters;
@@ -198,6 +200,7 @@ std::vector<Joint_Action> Environment::get_joint_actions(const State& state) con
 }
 
 State Environment::load(const std::string& path) {
+	reset();
 	std::ifstream file;
 	file.open(path);
 	std::string line;
@@ -229,8 +232,8 @@ State Environment::load(const std::string& path) {
 			break;
 		}
 		case 1: { 
-			goal_name = line;
-			goal_ingredient = goal_name_to_ingredient(line);
+			goal_names.push_back(line);
+			goal_ingredients.push_back(goal_name_to_ingredient(line));
 			break; 
 		}
 		case 2: {
@@ -248,6 +251,8 @@ State Environment::load(const std::string& path) {
 	for (size_t agent = 0; agent < number_of_agents; ++agent) {
 		state.agents.push_back(agents_initial_positions.at(agent));
 	}
+
+	calculate_recipes();
 
 	flip_walls_array();
 	file.close();
@@ -373,6 +378,10 @@ void Environment::play(State& state) const {
 Ingredient Environment::goal_name_to_ingredient(const std::string& name) const {
 	if (name == "Salad") {
 		return Ingredient::DELIVERED_SALAD;
+	} else if (name == "SimpleTomato") {
+		return Ingredient::DELIVERED_TOMATO;
+	} else if (name == "SimpleLettuce") {
+		return Ingredient::DELIVERED_LETTUCE;
 	} else {
 		std::cerr << "Unknown goal ingredient " << name << std::endl;
 		exit(-1);
@@ -393,6 +402,8 @@ const std::map<std::pair<Ingredient, Ingredient>, Ingredient>& Environment::get_
 	{ {Ingredient::PLATED_TOMATO, Ingredient::CHOPPED_LETTUCE}, Ingredient::PLATED_SALAD},
 
 	{ {Ingredient::DELIVERY, Ingredient::PLATED_SALAD}, Ingredient::DELIVERED_SALAD},
+	{ {Ingredient::DELIVERY, Ingredient::PLATED_TOMATO}, Ingredient::DELIVERED_TOMATO},
+	{ {Ingredient::DELIVERY, Ingredient::PLATED_LETTUCE}, Ingredient::DELIVERED_LETTUCE},
 	};
 	return recipes;
 }
@@ -410,26 +421,28 @@ std::optional<Ingredient> Environment::get_recipe(Ingredient ingredient1, Ingred
 
 
 std::vector<Recipe> Environment::get_possible_recipes(const State& state) const {
-	auto& recipes = get_recipes();
+	//auto& recipes = get_recipes();
 	std::vector<Recipe> possible_recipes;
 
-	for (const auto& recipe : recipes) {
-		auto& ingredients = recipe.first;
+	for (const auto& recipe : goal_related_recipes) {
 
 		// TODO - Should handle cutting/delivery stations in a little less hardcoded way
-		if ((state.contains_item(ingredients.first) || ingredients.first == Ingredient::CUTTING || ingredients.first == Ingredient::DELIVERY) && state.contains_item(ingredients.second)) {
-			possible_recipes.push_back({ ingredients.first, ingredients.second, recipe.second });
+		if ((state.contains_item(recipe.ingredient1) || recipe.ingredient1 == Ingredient::CUTTING || recipe.ingredient1 == Ingredient::DELIVERY) && state.contains_item(recipe.ingredient2)) {
+			possible_recipes.push_back(recipe);
 		}
 	}
 	return possible_recipes;
 }
 
-Ingredient Environment::get_goal() const {
-	return goal_ingredient;
+std::vector<Ingredient> Environment::get_goal() const {
+	return goal_ingredients;
 }
 
 bool Environment::is_done(const State& state) const {
-	return state.contains_item(goal_ingredient);
+	for (const auto& item : goal_ingredients) {
+		if (!state.contains_item(item)) return false;
+	}
+	return true;
 }
 
 Coordinate Environment::move(const Coordinate& coordinate, Direction direction) const {
@@ -481,4 +494,57 @@ std::vector<Coordinate> Environment::get_locations(const State& state, Ingredien
 	case Ingredient::DELIVERY: return delivery_stations;
 	default: return state.get_locations(ingredient);
 	}
+}
+
+std::vector<Coordinate> Environment::get_recipe_locations(const State& state, Ingredient ingredient) const {
+	exit(-1);
+}
+
+void Environment::reset() {
+	goal_names.clear();
+	goal_ingredients.clear();
+	agents_initial_positions.clear();
+
+	walls.clear();
+	cutting_stations.clear();
+	delivery_stations.clear();
+
+}
+
+
+void Environment::calculate_recipes() {
+	auto& recipes = get_recipes();
+
+	std::map<Ingredient, std::pair<Ingredient, Ingredient>> reversed_recipes;
+	for (const auto& recipe : recipes) {
+		reversed_recipes.insert({ recipe.second, {recipe.first.first, recipe.first.second} });
+	}
+
+	std::set<Ingredient> ingredients;
+	for (const auto& ingredient : goal_ingredients) {
+		ingredients.insert(ingredient);
+	}
+
+
+	bool done = false;
+	while (!done) {
+		auto ingredients_size = ingredients.size();
+		for (const auto& recipe : recipes) {
+			if (ingredients.find(recipe.second) != ingredients.end()) {
+				ingredients.insert(recipe.first.first);
+				ingredients.insert(recipe.first.second);
+			}
+		}
+		if (ingredients_size == ingredients.size()) {
+			break;
+		}
+	}
+
+	std::vector<Recipe> result;
+	for (const auto& recipe : recipes) {
+		if (ingredients.find(recipe.second) != ingredients.end()) {
+			result.push_back({ recipe.first.first, recipe.first.second, recipe.second });
+		}
+	}
+	goal_related_recipes = result;
 }

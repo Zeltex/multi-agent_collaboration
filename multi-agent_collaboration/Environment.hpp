@@ -105,6 +105,7 @@ struct Agent {
 
 struct State {
 	std::map<Coordinate, Ingredient> items;
+	std::vector<std::pair<Coordinate, Ingredient>> goal_items;
 	std::vector<Agent> agents;
 	std::optional<Ingredient> get_ingredient_at_position(Coordinate coordinate) const {
 		auto it = items.find(coordinate);
@@ -119,6 +120,9 @@ struct State {
 		for (const auto& item : items) {
 			if (item.second == ingredient) return true;
 		}
+		for (const auto& item : goal_items) {
+			if (item.second == ingredient) return true;
+		}
 		for (const auto& agent : agents) {
 			if (agent.item == ingredient) return true;
 		}
@@ -127,6 +131,10 @@ struct State {
 
 	void add(Coordinate coordinate, Ingredient ingredient) {
 		items.insert({ coordinate, ingredient });
+	}
+
+	void add_goal_item(Coordinate coordinate, Ingredient ingredient) {
+		goal_items.push_back({ coordinate, ingredient });
 	}
 
 	void remove(Coordinate coordinate) {
@@ -198,7 +206,7 @@ class Environment {
 public:
 
 	Environment(size_t number_of_agents) :
-		number_of_agents(number_of_agents), goal_name(), agents_initial_positions(), walls(), cutting_stations(), delivery_stations() {};
+		number_of_agents(number_of_agents), goal_names(), agents_initial_positions(), walls(), cutting_stations(), delivery_stations() {};
 
 	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
 	void act(State& state, const Action& action) const;
@@ -212,11 +220,13 @@ public:
 	void print_state(const State& state) const;
 	void play(State& state) const;
 	std::vector<Recipe> get_possible_recipes(const State& state) const;
-	Ingredient get_goal() const;
+	std::vector<Ingredient> get_goal() const;
 	bool is_done(const State& state) const;
 	size_t get_number_of_agents() const;
 	Joint_Action convert_to_joint_action(const Action& action, Agent_Id agent) const;
 	std::vector<Coordinate> get_locations(const State& state, Ingredient ingredient) const;
+	std::vector<Coordinate> get_recipe_locations(const State& state, Ingredient ingredient) const;
+	
 
 private:
 	void load_map_line(State& state, size_t& line_counter, const std::string& line, size_t width);
@@ -227,16 +237,18 @@ private:
 	void check_collisions(const State& state, Joint_Action& joint_action) const;
 	Coordinate move(const Coordinate& coordinate, Direction direction) const;
 	Coordinate move_noclip(const Coordinate& coordinate, Direction direction) const;
+	void reset();
+	void calculate_recipes();
 
 	size_t number_of_agents;
-	std::string goal_name;
-	Ingredient goal_ingredient;
+	std::vector<std::string> goal_names;
+	std::vector<Ingredient> goal_ingredients;
 	std::vector<Coordinate> agents_initial_positions;
 
 	std::vector<std::vector<bool>> walls;
 	std::vector<Coordinate> cutting_stations;
 	std::vector<Coordinate> delivery_stations;
-
+	std::vector<Recipe> goal_related_recipes;
 	
 };
 

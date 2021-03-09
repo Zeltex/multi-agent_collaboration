@@ -24,7 +24,6 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state, cons
 	bool done = false;
 	while (!done) {
 		auto current_state_id = frontier.top().state_id;
-		auto temp_again = frontier.top();
 		frontier.pop();
 		if (closed.at(current_state_id)) {
 			continue;
@@ -50,26 +49,6 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state, cons
 				if (states.at(visited_it->state_id).g > new_g) {
 					// Faster path found to already expanded node
 					if (closed.at(visited_it->state_id)) {
-
-						std::cout << "\n----- Printing visited it ------\n";
-						size_t temp = visited_it->state_id;
-						while (true) {
-							auto temp_state = states.at(temp);
-							environment.print_state(temp_state.state);
-							if (temp == 0) break;
-							temp = temp_state.parent_id;
-						}
-
-						std::cout << "\n----- Printing current ------\n";
-						temp = state_hash.state_id;
-						states.push_back({ state_hash.state, current_state_id, action, new_g });
-						while (true) {
-							auto temp_state = states.at(temp);
-							environment.print_state(temp_state.state);
-							if (temp == 0) break;
-							temp = temp_state.parent_id;
-						}
-
 						std::cerr << "Heuristic is not consistent" << std::endl;
 						exit(-1);
 
@@ -91,11 +70,12 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state, cons
 				if (state_hash.state.contains_item(recipe.result)) {
 					done = true;
 					goal_id = state_hash.state_id;
+					break;
 				}
 			}
 			frontier.push({ state_hash.state_id, new_g, heuristic(state_hash.state) });
 		}
-		if (frontier.empty()) {
+		if (!done && frontier.empty()) {
 			std::cerr << "Couldn't find path" << std::endl;
 			exit(-1);
 		}
