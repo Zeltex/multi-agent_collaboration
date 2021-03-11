@@ -13,6 +13,9 @@ using Coordinate = std::pair<size_t, size_t> ;
 struct Agent_Id {
 	Agent_Id(size_t id) :id(id) {};
 	size_t id;
+	bool operator==(const Agent_Id& other) const {
+		return this->id == other.id;
+	}
 };
 
 enum class Cell_Type {
@@ -209,12 +212,12 @@ public:
 		number_of_agents(number_of_agents), goal_names(), agents_initial_positions(), walls(), cutting_stations(), delivery_stations() {};
 
 	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
-	void act(State& state, const Action& action) const;
-	void act(State& state, const Action& action, Print_Level print_level) const;
-	void act(State& state, const Joint_Action& action) const;
-	void act(State& state, const Joint_Action& action, Print_Level print_level) const;
-	std::vector<Action> get_actions(const State& state, Agent_Id agent) const;
-	std::vector<Joint_Action> get_joint_actions(const State& state) const;
+	bool act(State& state, const Action& action) const;
+	bool act(State& state, const Action& action, Print_Level print_level) const;
+	bool act(State& state, const Joint_Action& action) const;
+	bool act(State& state, const Joint_Action& action, Print_Level print_level) const;
+	std::vector<Action> get_actions(Agent_Id agent) const;
+	std::vector<Joint_Action> get_joint_actions(const std::vector<Agent_Id>& agents) const;
 	State load(const std::string& path);
 	void print_state() const;
 	void print_state(const State& state) const;

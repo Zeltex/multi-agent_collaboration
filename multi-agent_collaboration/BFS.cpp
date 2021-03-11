@@ -6,10 +6,10 @@
 #include <iostream>
 
 std::vector<Action> BFS::search(const State& state, const Environment& environment, Ingredient goal, Agent_Id agent) const {
-	Search_State dummy( state, {Direction::DOWN, {0}}, 0, 0);
-	std::unordered_set<Search_State> visited;
-	std::vector<Search_State> path;
-	std::deque<Search_State> frontier;
+	Search_Joint_State dummy(state, { {} }, 0, 0);
+	std::unordered_set<Search_Joint_State> visited;
+	std::vector<Search_Joint_State> path;
+	std::deque<Search_Joint_State> frontier;
 	path.push_back(dummy);
 	visited.insert(dummy);
 	frontier.push_back(dummy);
@@ -22,16 +22,15 @@ std::vector<Action> BFS::search(const State& state, const Environment& environme
 	std::vector<size_t> hashes;
 	hashes.push_back(state.to_hash());
 
+	auto actions = environment.get_joint_actions({ agent });
 	while (!done) {
 		auto current_state = frontier.front();
 		frontier.pop_front();
 
-		auto actions = environment.get_actions(state, agent);
 		for (const auto& action : actions) {
 			auto temp_state = current_state;
-			auto joint_action = environment.convert_to_joint_action(action, agent);
-			environment.act(temp_state.state, joint_action, Print_Level::NOPE);
-			auto search_state = Search_State(temp_state.state, action, current_state.id, state_id);
+			environment.act(temp_state.state, action, Print_Level::NOPE);
+			auto search_state = Search_Joint_State(temp_state.state, action, current_state.id, state_id);
 			if (visited.find(search_state) == visited.end()) {
 				hashes.push_back(search_state.state.to_hash());
 				visited.insert(search_state);
@@ -54,15 +53,15 @@ std::vector<Action> BFS::search(const State& state, const Environment& environme
 	}
 
 	size_t current_id = goal_id;
-	std::vector<Action> actions;
+	std::vector<Action> result_actions;
 	while (current_id != 0) {
 		auto temp_state = path.at(current_id);
-		actions.push_back(temp_state.action);
+		result_actions.push_back(temp_state.action.actions.at(agent.id));
 		current_id = temp_state.parent_id;
 	}
 
 	std::vector<Action> reverse_actions;
-	for (auto it = actions.rbegin(); it < actions.rend(); ++it) {
+	for (auto it = result_actions.rbegin(); it < result_actions.rend(); ++it) {
 		reverse_actions.push_back(*it);
 	}
 
@@ -82,11 +81,16 @@ std::vector<Joint_Action> BFS::search_joint(const State& state, const Environmen
 	size_t state_id = 1;
 	size_t goal_id = 0;
 
+	std::vector<Agent_Id> agents;
+	for (size_t i = 0; i < environment.get_number_of_agents(); ++i) {
+		agents.push_back({ i });
+	}
+
+	auto actions = environment.get_joint_actions(agents);
 	while (!done) {
 		auto current_state = frontier.front();
 		frontier.pop_front();
 
-		auto actions = environment.get_joint_actions(state);
 		for (const auto& action : actions) {
 			auto temp_state = current_state;
 			environment.act(temp_state.state, action, Print_Level::NOPE);
@@ -106,15 +110,15 @@ std::vector<Joint_Action> BFS::search_joint(const State& state, const Environmen
 	}
 
 	size_t current_id = goal_id;
-	std::vector<Joint_Action> actions;
+	std::vector<Joint_Action> result_actions;
 	while (current_id != 0) {
 		auto temp_state = path.at(current_id);
-		actions.push_back(temp_state.action);
+		result_actions.push_back(temp_state.action);
 		current_id = temp_state.parent_id;
 	}
 
 	std::vector<Joint_Action> reverse_actions;
-	for (auto it = actions.rbegin(); it < actions.rend(); ++it) {
+	for (auto it = result_actions.rbegin(); it < result_actions.rend(); ++it) {
 		reverse_actions.push_back(*it);
 	}
 

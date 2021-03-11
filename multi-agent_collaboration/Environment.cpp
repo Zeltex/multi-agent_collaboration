@@ -25,23 +25,29 @@ bool Environment::is_cell_type(const Coordinate& coordinate, const Cell_Type& ty
 	return false;
 }
 
-void Environment::act(State& state, const Joint_Action& action) const {
+bool Environment::act(State& state, const Joint_Action& action) const {
 	return act(state, action, Print_Level::DEBUG);
 }
 
-void Environment::act(State& state, const Joint_Action& joint_action, Print_Level print_level) const {
+bool Environment::act(State& state, const Joint_Action& joint_action, Print_Level print_level) const {
 	auto temp_action = joint_action; // Need to modify the action, potentially take non-const as argument instead
 	check_collisions(state, temp_action);
+	bool valid_action = false;
 	for (const auto& action : temp_action.actions) {
-		act(state, action, print_level);
+		valid_action |= act(state, action, print_level);
 	}
+	return valid_action;
 }
 
-void Environment::act(State& state, const Action& action) const {
+bool Environment::act(State& state, const Action& action) const {
 	return act(state, action, Print_Level::DEBUG);
 }
 
-void Environment::act(State& state, const Action& action, Print_Level print_level) const {
+bool Environment::act(State& state, const Action& action, Print_Level print_level) const {
+	if (action.direction == Direction::NONE) {
+		return false;
+	}
+
 	auto& agent = state.agents.at(action.agent.id);
 	Coordinate old_position = agent.coordinate;
 	Coordinate new_position = move_noclip(old_position, action.direction);	
@@ -53,6 +59,7 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 	if (!is_cell_type(new_position, Cell_Type::WALL)) {
 		state.agents.at(action.agent.id).move_to(new_position);
 		PRINT(print_level, std::string("Moved ") + static_cast<char>(action.direction));
+		return true;
 
 	// Goal condition
 	} else if (is_cell_type(new_position, Cell_Type::DELIVERY_STATION)) {
@@ -62,6 +69,7 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 				agent.clear_item();
 				state.add_goal_item(new_position, recipe.value());
 				PRINT(print_level, std::string("goal ingredient delivered ") + static_cast<char>(recipe.value()));
+				return true;
 			}
 		}
 
@@ -73,6 +81,7 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 			agent.clear_item();
 			state.add(new_position, recipe.value());
 			PRINT(print_level, std::string("Combine ") + static_cast<char>(recipe.value()));
+			return true;
 		} else {
 			auto recipe_reverse = get_recipe(item_new_position.value(), item_old_position.value());
 			if (recipe_reverse.has_value()) {
@@ -80,9 +89,9 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 				agent.clear_item();
 				state.add(new_position, recipe_reverse.value());
 				PRINT(print_level, std::string("Combine ") + static_cast<char>(recipe_reverse.value()));
+				return true;
 			}
 		}
-
 
 	// Chop chop / pickup
 	} else if (is_cell_type(new_position, Cell_Type::CUTTING_STATION) && item_new_position.has_value()) {
@@ -91,10 +100,12 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 			state.remove(new_position);
 			state.add(new_position, recipe.value());
 			PRINT(print_level, std::string("chop chop ") + static_cast<char>(recipe.value()));
+			return true;
 		} else if (!item_old_position.has_value()){
 			state.remove(new_position);
 			agent.set_item(item_new_position.value());
 			PRINT(print_level, std::string("pickup"));
+			return true;
 		}
 
 
@@ -103,16 +114,18 @@ void Environment::act(State& state, const Action& action, Print_Level print_leve
 		agent.clear_item();
 		state.add(new_position, item_old_position.value());
 		PRINT(print_level, std::string("place ") + static_cast<char>(item_old_position.value()));
+		return true;
 
 	// Pickup
 	} else if (item_new_position.has_value()) {
 		state.remove(new_position);
 		agent.set_item(item_new_position.value());
 		PRINT(print_level, std::string("pickup ") + static_cast<char>(item_new_position.value()));
-	} else {
-		// They are simply humping a wall
-		PRINT(print_level, std::string("Nothing happened"));
+		return true;
 	}
+	// They simply decided to hump a wall
+	PRINT(print_level, std::string("Nothing happened"));
+	return false;
 }
 
 // This collision check is basically a one to one from the BD, but I believe it allows two agents to collide if one is no'opping, need to check this
@@ -165,17 +178,19 @@ void Environment::check_collisions(const State& state, Joint_Action& joint_actio
 
 }
 
-std::vector<Action> Environment::get_actions(const State& state, Agent_Id agent) const {
+std::vector<Action> Environment::get_actions(Agent_Id agent) const {
 	return { {Direction::UP, agent}, {Direction::RIGHT, agent}, {Direction::DOWN, agent}, {Direction::LEFT, agent}, {Direction::NONE, agent} };
 }
 
-
-#define NONE_INDEX 4
-std::vector<Joint_Action> Environment::get_joint_actions(const State& state) const {
+std::vector<Joint_Action> Environment::get_joint_actions(const std::vector<Agent_Id>& agents) const {
 	std::vector<std::vector<Action>> single_actions;
 	std::vector<size_t> counters;
 	for (size_t agent = 0; agent < number_of_agents; ++agent) {
-		single_actions.push_back(get_actions(state, agent));
+		if (std::find(agents.begin(), agents.end(), Agent_Id{ agent }) != agents.end()) {
+			single_actions.push_back(get_actions({ agent }));
+		} else {
+			single_actions.push_back({ { Direction::NONE, agent } });
+		}
 		counters.emplace_back(0);
 	}
 

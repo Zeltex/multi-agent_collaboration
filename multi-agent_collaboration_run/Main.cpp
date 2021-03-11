@@ -29,6 +29,8 @@ void solve(Environment& environment) {
 	//open-divider_salad.txt
 
 	auto paths = get_all_files("../levels/BD/");
+	//std::vector<std::string> paths{ "../levels/BD/partial-divider_salad.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/full-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_salad.txt" };
 	std::vector<Solution> solutions;
 
@@ -47,7 +49,10 @@ void solve(Environment& environment) {
 			for (const auto& planner : planners) {
 				actions.push_back(planner.get_next_action(state));
 			}
-			environment.act(state, { actions });
+			if (!environment.act(state, { actions })) {
+				action_count = 0;
+				break;
+			}
 			//environment.act(state, planner.get_next_action(state));
 			environment.print_state(state);
 			++action_count;
@@ -62,6 +67,8 @@ void solve(Environment& environment) {
 	for (const auto& solution : solutions) {
 		std::cout << solution.actions << " : " << solution.time << " : " << solution.path << std::endl;
 	}
+	size_t something;
+	std::cout << " - " << std::endl;
 }
 
 int main(int argc, char* argv[]) {

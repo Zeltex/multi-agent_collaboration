@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Environment.hpp"
+#include <vector>
 
 class Planner {
 public:
@@ -8,6 +9,8 @@ public:
 	Action get_next_action(const State& state) const;
 
 private:
+	std::vector<std::vector<Agent_Id>> get_combinations(size_t n) const;
+
 	Agent_Id agent;
 	Environment environment;
 };
