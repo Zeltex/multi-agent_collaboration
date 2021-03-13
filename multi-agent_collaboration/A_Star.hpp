@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include "Environment.hpp"
+#include "Search.hpp"
 
 struct Node {
 	Node(size_t state_id, size_t g, size_t h, size_t action_count) : 
@@ -87,14 +88,14 @@ struct Heuristic {
 	Ingredient ingredient2;
 };
 
-class A_Star {
+class A_Star : public Search_Method {
 public:
 	std::vector<Joint_Action> search_joint(const State& state, const Environment& environment, 
-		Recipe recipe, const std::vector<Agent_Id>& agents) const;
+		Recipe recipe, const std::vector<Agent_Id>& agents) const override;
 	
 	std::vector<Joint_Action> search_joint(const State& state, const Environment& environment, 
-		Recipe recipe, const std::vector<Agent_Id>& agents, size_t depth_limit) const;
+		Recipe recipe, const std::vector<Agent_Id>& agents, size_t depth_limit) const override;
 private:
 	size_t get_action_cost(const Joint_Action& action) const;
-	std::vector<Joint_Action> extract_actions(size_t goal_id, const std::vector<State_Info>& states) const;
+	//std::vector<Joint_Action> extract_actions(size_t goal_id, const std::vector<State_Info>& states) const;
 };

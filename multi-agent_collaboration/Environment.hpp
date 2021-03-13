@@ -55,6 +55,12 @@ struct Recipe {
 	Ingredient ingredient1;
 	Ingredient ingredient2;
 	Ingredient result;
+	bool operator<(const Recipe& other) const {
+		if (ingredient1 != other.ingredient1) return ingredient1 < other.ingredient1;
+		if (ingredient2 != other.ingredient2) return ingredient2 < other.ingredient2;
+		if (result != other.result) return result < other.result;
+		return false;
+	}
 };
 
 struct Action {

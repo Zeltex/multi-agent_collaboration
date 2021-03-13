@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include "Environment.hpp"
 
 class Search_State {
@@ -52,3 +53,31 @@ namespace std {
 		}
 	};
 }
+
+class Search_Method {
+public:
+	virtual std::vector<Joint_Action> search_joint(const State& state, const Environment& environment,
+		Recipe recipe, const std::vector<Agent_Id>& agents, size_t depth_limit) const = 0;
+	virtual std::vector<Joint_Action> search_joint(const State& state, const Environment& environment,
+		Recipe recipe, const std::vector<Agent_Id>& agents) const = 0;
+protected:
+		template<typename T>
+		std::vector<Joint_Action> extract_actions(size_t goal_id, const std::vector<T>& states) const;
+};
+
+class Search {
+public:
+	Search(std::unique_ptr<Search_Method> search_method) :search_method(std::move(search_method)) {};
+	std::vector<Joint_Action> search_joint(const State& state, const Environment& environment,
+		Recipe recipe, const std::vector<Agent_Id>& agents, size_t depth_limit) const {
+		return search_method->search_joint(state, environment, recipe, agents, depth_limit);
+	}
+	std::vector<Joint_Action> search_joint(const State& state, const Environment& environment,
+		Recipe recipe, const std::vector<Agent_Id>& agents) const {
+		return search_method->search_joint(state, environment, recipe, agents);
+	}
+private:
+	std::unique_ptr<Search_Method> search_method;
+};
+
+#include "Search.ipp"
