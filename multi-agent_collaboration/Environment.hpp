@@ -125,6 +125,27 @@ struct State {
 		}
 	}
 
+	bool items_hoarded(const Recipe& recipe, const std::vector<Agent_Id>& available_agents) const {
+		std::vector<Ingredient> items_needed{ recipe.ingredient1, recipe.ingredient2 };
+		for (const auto& item : items) {
+			auto it = std::find(items_needed.begin(), items_needed.end(), item.second);
+			if (it != items_needed.end()) {
+				items_needed.erase(it);
+				if (items_needed.empty()) false;
+			}
+		}
+
+		for (size_t i = 0; i < agents.size(); ++i) {
+			if (agents.at(i).item.has_value()) {
+				if (std::find(items_needed.begin(), items_needed.end(), agents.at(i).item.value()) != items_needed.end()
+					&& std::find(available_agents.begin(), available_agents.end(), Agent_Id{ i }) == available_agents.end()) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	bool contains_item(Ingredient ingredient) const {
 		for (const auto& item : items) {
 			if (item.second == ingredient) return true;

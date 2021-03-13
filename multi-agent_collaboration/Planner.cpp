@@ -81,6 +81,11 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 		size_t recipe_counter = 0;
 		for (size_t i = 0; i < recipe_size; ++i) {
 			const auto& recipe = recipes.at(i);
+
+			if (state.items_hoarded(recipe, agents)) {
+				continue;
+			}
+
 			Search search(std::make_unique<A_Star>());
 
 			auto path = search.search_joint(state, environment, recipe, agents, INITIAL_DEPTH_LIMIT);

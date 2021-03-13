@@ -32,6 +32,8 @@ void solve(Environment& environment) {
 	//std::vector<std::string> paths{ "../levels/BD/partial-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/full-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_salad.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/open-divider_tl.txt" };
+	
 	std::vector<Solution> solutions;
 
 	for (const auto& path : paths) {
