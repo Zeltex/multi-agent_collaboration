@@ -6,12 +6,12 @@
 #include <iostream>
 
 std::vector<Joint_Action> BFS::search_joint(const State& original_state, const Environment& environment,
-	Recipe recipe, const std::vector<Agent_Id>& agents) const {
+	Recipe recipe, const Agent_Combination& agents) const {
 	return search_joint(original_state, environment, recipe, agents, (size_t)-1);
 }
 
 std::vector<Joint_Action> BFS::search_joint(const State& state, const Environment& environment,
-	Recipe recipe, const std::vector<Agent_Id>& agents, size_t depth_limit) const {
+	Recipe recipe, const Agent_Combination& agents, size_t depth_limit) const {
 	Search_Joint_State dummy(state, { { } }, 0, 0);
 	std::unordered_set<Search_Joint_State> visited;
 	std::vector<Search_Joint_State> path;

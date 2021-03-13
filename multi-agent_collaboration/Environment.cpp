@@ -189,11 +189,11 @@ std::vector<Action> Environment::get_actions(Agent_Id agent) const {
 	return { {Direction::UP, agent}, {Direction::RIGHT, agent}, {Direction::DOWN, agent}, {Direction::LEFT, agent}, {Direction::NONE, agent} };
 }
 
-std::vector<Joint_Action> Environment::get_joint_actions(const std::vector<Agent_Id>& agents) const {
+std::vector<Joint_Action> Environment::get_joint_actions(const Agent_Combination& agents) const {
 	std::vector<std::vector<Action>> single_actions;
 	std::vector<size_t> counters;
 	for (size_t agent = 0; agent < number_of_agents; ++agent) {
-		if (std::find(agents.begin(), agents.end(), Agent_Id{ agent }) != agents.end()) {
+		if (agents.contains({ agent })) {
 			single_actions.push_back(get_actions({ agent }));
 		} else {
 			single_actions.push_back({ { Direction::NONE, agent } });
@@ -235,7 +235,6 @@ State Environment::load(const std::string& path) {
 	State state;
 
 	size_t load_status = 0;
-	size_t width;
 	size_t line_counter = 0;
 	while (std::getline(file, line)) {
 		if (line_counter == 0) {
@@ -243,6 +242,9 @@ State Environment::load(const std::string& path) {
 		}
 
 		if (line.empty()) {
+			if (load_status == 0) {
+				height = line_counter;
+			}
 			++load_status;
 			continue;
 		}
@@ -569,4 +571,20 @@ void Environment::calculate_recipes() {
 		}
 	}
 	goal_related_recipes = result;
+}
+
+
+size_t Environment::get_width() const {
+	return width;
+}
+size_t Environment::get_height() const {
+	return height;
+}
+
+std::vector<Coordinate> Environment::get_neighbours(Coordinate location) const {
+	return {
+		{location.first, location.second - 1},
+		{location.first + 1, location.second},
+		{location.first, location.second + 1},
+		{location.first - 1, location.second} };
 }

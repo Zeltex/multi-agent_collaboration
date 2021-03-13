@@ -62,9 +62,11 @@ struct Node_Comparator {
 	}
 };
 
+// Could optimise some by calculating distance from all ingredients to nearest agent
+// and using this in combination with the location1/location2 nested for loops
 #define INFINITE_HEURISTIC 1000
 struct Heuristic {
-	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2, const std::vector<Agent_Id>& agents)
+	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2, const Agent_Combination& agents)
 		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2),  agents(agents) {};
 
 	size_t euclidean(Coordinate location1, Coordinate location2) const {
@@ -88,7 +90,7 @@ struct Heuristic {
 		size_t min_agent_dist = (size_t)-1;
 		if (!environment.is_type_stationary(ingredient1)) {
 			for (const auto& location1 : locations1) {
-				for (const auto& agent_id : agents) {
+				for (const auto& agent_id : agents.get()) {
 					const auto& agent = state.agents.at(agent_id.id);
 					min_agent_dist = std::min(min_agent_dist, euclidean(location1, agent.coordinate));
 				}
@@ -96,7 +98,7 @@ struct Heuristic {
 		}
 		if (!environment.is_type_stationary(ingredient2)) {
 			for (const auto& location2 : locations2) {
-				for (const auto& agent_id : agents) {
+				for (const auto& agent_id : agents.get()) {
 					const auto& agent = state.agents.at(agent_id.id);
 					min_agent_dist = std::min(min_agent_dist, euclidean(location2, agent.coordinate));
 				}
@@ -112,16 +114,16 @@ struct Heuristic {
 	Environment environment; 
 	Ingredient ingredient1; 
 	Ingredient ingredient2;
-	std::vector<Agent_Id> agents;
+	Agent_Combination agents;
 };
 
 class A_Star : public Search_Method {
 public:
 	std::vector<Joint_Action> search_joint(const State& state, const Environment& environment, 
-		Recipe recipe, const std::vector<Agent_Id>& agents) const override;
+		Recipe recipe, const Agent_Combination& agents) const override;
 	
 	std::vector<Joint_Action> search_joint(const State& state, const Environment& environment, 
-		Recipe recipe, const std::vector<Agent_Id>& agents, size_t depth_limit) const override;
+		Recipe recipe, const Agent_Combination& agents, size_t depth_limit) const override;
 private:
 	size_t get_action_cost(const Joint_Action& action) const;
 	//std::vector<Joint_Action> extract_actions(size_t goal_id, const std::vector<State_Info>& states) const;

@@ -16,6 +16,12 @@ struct Agent_Id {
 	bool operator==(const Agent_Id& other) const {
 		return this->id == other.id;
 	}
+	bool operator!=(const Agent_Id& other) const {
+		return !(this->id == other.id);
+	}
+	bool operator<(const Agent_Id& other) const {
+		return this->id < other.id;
+	}
 };
 
 enum class Cell_Type {
@@ -112,6 +118,34 @@ struct Agent {
 	}
 };
 
+
+struct Agent_Combination {
+	Agent_Combination() : agents() {}
+	Agent_Combination(std::vector<Agent_Id> agents) : agents(agents) { }
+	std::vector<Agent_Id> agents;
+
+	bool operator<(const Agent_Combination& other) const {
+		if (agents.size() != other.agents.size()) return agents.size() < other.agents.size();
+		for (size_t i = 0; i < agents.size(); ++i) {
+			if (agents.at(i) != other.agents.at(i)) return agents.at(i) < other.agents.at(i);
+		}
+		return false;
+	}
+
+	bool contains(Agent_Id agent) const {
+		return std::find(agents.begin(), agents.end(), agent) != agents.end();
+	}
+
+	const std::vector<Agent_Id>& get() const {
+		return agents;
+	}
+
+	size_t size() const {
+		return agents.size();
+	}
+};
+
+
 struct State {
 	std::map<Coordinate, Ingredient> items;
 	std::vector<std::pair<Coordinate, Ingredient>> goal_items;
@@ -125,7 +159,7 @@ struct State {
 		}
 	}
 
-	bool items_hoarded(const Recipe& recipe, const std::vector<Agent_Id>& available_agents) const {
+	bool items_hoarded(const Recipe& recipe, const Agent_Combination& available_agents) const {
 		std::vector<Ingredient> items_needed{ recipe.ingredient1, recipe.ingredient2 };
 		for (const auto& item : items) {
 			auto it = std::find(items_needed.begin(), items_needed.end(), item.second);
@@ -138,12 +172,16 @@ struct State {
 		for (size_t i = 0; i < agents.size(); ++i) {
 			if (agents.at(i).item.has_value()) {
 				if (std::find(items_needed.begin(), items_needed.end(), agents.at(i).item.value()) != items_needed.end()
-					&& std::find(available_agents.begin(), available_agents.end(), Agent_Id{ i }) == available_agents.end()) {
+					&& !available_agents.contains({ i })) {
 					return true;
 				}
 			}
 		}
 		return false;
+	}
+
+	Coordinate get_location(Agent_Id agent) const {
+		return agents.at(agent.id).coordinate;
 	}
 
 	bool contains_item(Ingredient ingredient) const {
@@ -236,7 +274,8 @@ class Environment {
 public:
 
 	Environment(size_t number_of_agents) :
-		number_of_agents(number_of_agents), goal_names(), agents_initial_positions(), walls(), cutting_stations(), delivery_stations() {};
+		number_of_agents(number_of_agents), goal_names(), agents_initial_positions(), walls(), 
+		cutting_stations(), delivery_stations(), width(), height() {};
 
 	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
 	bool is_type_stationary(Ingredient ingredient) const;
@@ -245,7 +284,7 @@ public:
 	bool act(State& state, const Joint_Action& action) const;
 	bool act(State& state, const Joint_Action& action, Print_Level print_level) const;
 	std::vector<Action> get_actions(Agent_Id agent) const;
-	std::vector<Joint_Action> get_joint_actions(const std::vector<Agent_Id>& agents) const;
+	std::vector<Joint_Action> get_joint_actions(const Agent_Combination& agents) const;
 	State load(const std::string& path);
 	void print_state() const;
 	void print_state(const State& state) const;
@@ -257,6 +296,9 @@ public:
 	Joint_Action convert_to_joint_action(const Action& action, Agent_Id agent) const;
 	std::vector<Coordinate> get_locations(const State& state, Ingredient ingredient) const;
 	std::vector<Coordinate> get_recipe_locations(const State& state, Ingredient ingredient) const;
+	size_t get_width() const;
+	size_t get_height() const;
+	std::vector<Coordinate> get_neighbours(Coordinate location) const;
 	
 
 private:
@@ -270,6 +312,9 @@ private:
 	Coordinate move_noclip(const Coordinate& coordinate, Direction direction) const;
 	void reset();
 	void calculate_recipes();
+
+	size_t width;
+	size_t height;
 
 	size_t number_of_agents;
 	std::vector<std::string> goal_names;

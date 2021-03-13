@@ -7,6 +7,7 @@
 #include <chrono>
 #include <iostream>
 #include <set>
+#include <deque>
 
 
 
@@ -60,7 +61,7 @@ Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::v
 
 bool Planner::agent_in_best_solution(const std::map<Recipe, Recipe_Solution>& best_solutions, const Action_Path& action_path) const {
 	auto& best_agents = best_solutions.at(action_path.recipe).agents;
-	return (std::find(best_agents.begin(), best_agents.end(), agent) != best_agents.end());
+	return best_agents.contains(agent);
 }
 
 bool Planner::contains_useful_action(const Action_Path& action_path) const {
@@ -81,6 +82,10 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 		size_t recipe_counter = 0;
 		for (size_t i = 0; i < recipe_size; ++i) {
 			const auto& recipe = recipes.at(i);
+
+			if (!ingredients_reachable(recipe, agents, state)) {
+				continue;
+			}
 
 			if (state.items_hoarded(recipe, agents)) {
 				continue;
@@ -107,7 +112,7 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 
 
 			std::cout << "(";
-			for (const auto& agent : agents) {
+			for (const auto& agent : agents.get()) {
 				std::cout << agent.id << ",";
 			}
 			std::cout << ") : " << trim_path.size() << " : " << static_cast<char>(recipe.result) <<  " : " << diff << std::endl;
@@ -117,15 +122,35 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 	return paths;
 }
 
+bool Planner::ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const {
+	auto reachables = agent_reachables.find(agents);
+	if (reachables == agent_reachables.end()) {
+		std::cerr << "Unknown agent combination" << std::endl;
+		exit(-1);
+	}
+
+	for (const auto& location : environment.get_locations(state, recipe.ingredient1)) {
+		if (!reachables->second.get(location)) {
+			return false;
+		}
+	}
+
+	for (const auto& location : environment.get_locations(state, recipe.ingredient2)) {
+		if (!reachables->second.get(location)) {
+			return false;
+		}
+	}
+}
+
 // Get all combinations of numbers/agents <n
-std::vector<std::vector<Agent_Id>> Planner::get_combinations(size_t n) const {
+std::vector<Agent_Combination> Planner::get_combinations(size_t n) const {
 	if (n == 0) return {};
 	std::vector<bool> status;
 	status.push_back(true);
 	for (size_t i = 1; i < n; ++i) {
 		status.push_back(false);
 	}
-	std::vector<std::vector<Agent_Id>> combinations;
+	std::vector<Agent_Combination> combinations;
 
 	bool done = false;
 	while (!done) {
@@ -151,4 +176,36 @@ std::vector<std::vector<Agent_Id>> Planner::get_combinations(size_t n) const {
 		combinations.push_back(next_combination);
 	}
 	return combinations;
+}
+
+
+void Planner::intialize_reachables(const State& initial_state) {
+	auto combinations = get_combinations(initial_state.agents.size());
+	for (const auto& agents : combinations) {
+		Reachables reachables(environment.get_width(), environment.get_height());
+
+		// Initial agent locations
+		std::deque<Coordinate> frontier;
+		for (const auto& agent : agents.get()) {
+			auto location = initial_state.get_location(agent);
+			reachables.set(location, true);
+			frontier.push_back(location);
+		}
+
+		// BFS search
+		while (!frontier.empty()) {
+			auto next = frontier.front();
+			frontier.pop_front();
+			
+			for (const auto& location : environment.get_neighbours(next)) {
+				if (!reachables.get(location)) {
+					reachables.set(location, true);
+					if (!environment.is_cell_type(location, Cell_Type::WALL)) {
+						frontier.push_back(location);
+					}
+				}
+			}
+		}
+		agent_reachables.insert({ agents, reachables });
+	}
 }

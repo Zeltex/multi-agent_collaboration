@@ -42,7 +42,7 @@ void solve(Environment& environment) {
 		auto time_start = std::chrono::system_clock::now();
 		std::vector<Planner> planners;
 		for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
-			planners.push_back(Planner{ environment, agent });
+			planners.push_back(Planner{ environment, agent, state});
 
 		}
 		while (!environment.is_done(state)) {

@@ -5,13 +5,13 @@
 #include <iostream>
 
 std::vector<Joint_Action> A_Star::search_joint(const State& original_state, const Environment& environment,
-	Recipe recipe, const std::vector<Agent_Id>& agents) const {
+	Recipe recipe, const Agent_Combination& agents) const {
 	return search_joint(original_state, environment, recipe, agents, (size_t)-1);
 }
 
 
 std::vector<Joint_Action> A_Star::search_joint(const State& original_state, const Environment& environment, 
-		Recipe recipe, const std::vector<Agent_Id>& agents, size_t depth_limit) const {
+		Recipe recipe, const Agent_Combination& agents, size_t depth_limit) const {
 	// TODO - Implement agents
 	std::priority_queue<Node, std::vector<Node>, Node_Comparator> frontier; // Open list		f, g, h, state_id, action_count
 	std::unordered_set<State_Hash> visited;									// State lookup		state, state_id
