@@ -18,7 +18,7 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state, cons
 	std::vector<State_Info> states;											// State id lookup	state, parent_state_id, action, g, action_count
 	std::vector<bool> closed;												// Closed list		[state_id]=is_closed
 
-	Heuristic heuristic(environment, recipe.ingredient1, recipe.ingredient2);
+	Heuristic heuristic(environment, recipe.ingredient1, recipe.ingredient2, agents);
 
 	size_t original_id = 0;
 	size_t original_g = 0;

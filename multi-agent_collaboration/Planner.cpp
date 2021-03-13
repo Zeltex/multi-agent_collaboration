@@ -88,24 +88,29 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 
 			Search search(std::make_unique<A_Star>());
 
+			auto time_start = std::chrono::system_clock::now();
 			auto path = search.search_joint(state, environment, recipe, agents, INITIAL_DEPTH_LIMIT);
+			auto time_end = std::chrono::system_clock::now();
 
-			if (path.empty()) continue;
+			auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
+
+
 
 			auto trim_path = path;
-			Search_Trimmer trim;
-			trim.trim(trim_path, state, environment, recipe);
+			if (!trim_path.empty()) {
+				Search_Trimmer trim;
+				trim.trim(trim_path, state, environment, recipe);
 
 
-			paths.insert({ Action_Path{trim_path, recipe, agents} });
-
+				paths.insert({ Action_Path{trim_path, recipe, agents} });
+			}
 
 
 			std::cout << "(";
 			for (const auto& agent : agents) {
 				std::cout << agent.id << ",";
 			}
-			std::cout << ") : " << trim_path.size() << " : " << static_cast<char>(recipe.result) << std::endl;
+			std::cout << ") : " << trim_path.size() << " : " << static_cast<char>(recipe.result) <<  " : " << diff << std::endl;
 
 		}
 	}

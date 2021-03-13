@@ -64,8 +64,13 @@ struct Node_Comparator {
 
 #define INFINITE_HEURISTIC 1000
 struct Heuristic {
-	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2)
-		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2) {};
+	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2, const std::vector<Agent_Id>& agents)
+		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2),  agents(agents) {};
+
+	size_t euclidean(Coordinate location1, Coordinate location2) const {
+		return (size_t) (std::abs((int)location1.first - (int)location2.first)
+			+ std::abs((int)location1.second - (int)location2.second));
+	}
 	size_t operator()(const State& state) {
 		auto locations1 = environment.get_locations(state, ingredient1);
 		auto locations2 = environment.get_locations(state, ingredient2);
@@ -77,15 +82,37 @@ struct Heuristic {
 		size_t min_dist = (size_t)-1;
 		for (const auto& location1 : locations1) {
 			for (const auto& location2 : locations2) {
-				min_dist = std::min(min_dist, (size_t)std::abs((int)location1.first - (int)location2.first) + std::abs((int)location1.second - (int)location2.second));
+				min_dist = std::min(min_dist, euclidean(location1, location2));
 			}
 		}
-		return min_dist == (size_t)-1 ? 0 : min_dist;
+		size_t min_agent_dist = (size_t)-1;
+		if (!environment.is_type_stationary(ingredient1)) {
+			for (const auto& location1 : locations1) {
+				for (const auto& agent_id : agents) {
+					const auto& agent = state.agents.at(agent_id.id);
+					min_agent_dist = std::min(min_agent_dist, euclidean(location1, agent.coordinate));
+				}
+			}
+		}
+		if (!environment.is_type_stationary(ingredient2)) {
+			for (const auto& location2 : locations2) {
+				for (const auto& agent_id : agents) {
+					const auto& agent = state.agents.at(agent_id.id);
+					min_agent_dist = std::min(min_agent_dist, euclidean(location2, agent.coordinate));
+				}
+			}
+		}
+		if (min_dist == (size_t)-1) min_dist = 0;
+		if (min_agent_dist == (size_t)-1) min_agent_dist = 0;
+
+
+		return min_dist + min_agent_dist;
 	}
 
 	Environment environment; 
 	Ingredient ingredient1; 
 	Ingredient ingredient2;
+	std::vector<Agent_Id> agents;
 };
 
 class A_Star : public Search_Method {
