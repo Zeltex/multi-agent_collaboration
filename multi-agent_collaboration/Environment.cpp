@@ -451,11 +451,18 @@ std::vector<Recipe> Environment::get_possible_recipes(const State& state) const 
 	for (const auto& recipe : goal_related_recipes) {
 
 		// TODO - Should handle cutting/delivery stations in a little less hardcoded way
-		if ((state.contains_item(recipe.ingredient1) || recipe.ingredient1 == Ingredient::CUTTING || recipe.ingredient1 == Ingredient::DELIVERY) && state.contains_item(recipe.ingredient2)) {
+		if ((state.contains_item(recipe.ingredient1) 
+			|| recipe.ingredient1 == Ingredient::CUTTING 
+			|| recipe.ingredient1 == Ingredient::DELIVERY) 
+			&& state.contains_item(recipe.ingredient2)) {
 			possible_recipes.push_back(recipe);
 		}
 	}
 	return possible_recipes;
+}
+
+const std::vector<Recipe>& Environment::get_all_recipes() const {
+	return goal_related_recipes;
 }
 
 std::vector<Ingredient> Environment::get_goal() const {

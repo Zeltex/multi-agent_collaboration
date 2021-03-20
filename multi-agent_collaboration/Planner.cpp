@@ -8,17 +8,22 @@
 #include <iostream>
 #include <set>
 #include <deque>
+#include <numeric>
 
 
 
-#define INITIAL_DEPTH_LIMIT 18
-Action Planner::get_next_action(const State& state) const {
+constexpr auto INITIAL_DEPTH_LIMIT = 18;
+Action Planner::get_next_action(const State& state) {
 	auto recipes = environment.get_possible_recipes(state);
 	if (recipes.empty()) {
 		return { Direction::NONE, { agent } };
 	}
 	auto paths = get_all_paths(recipes, state);
-	return get_best_action(paths, recipes);
+	update_recipe_solutions(paths);
+	recognize_goals();
+	auto action = get_best_action(paths, recipes);
+	++time_step;
+	return action;
 }
 
 Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::vector<Recipe>& recipes) const {
@@ -83,11 +88,7 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 		for (size_t i = 0; i < recipe_size; ++i) {
 			const auto& recipe = recipes.at(i);
 
-			if (!ingredients_reachable(recipe, agents, state)) {
-				continue;
-			}
-
-			if (state.items_hoarded(recipe, agents)) {
+			if (!ingredients_reachable(recipe, agents, state) || state.items_hoarded(recipe, agents)) {
 				continue;
 			}
 
@@ -110,7 +111,6 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 				paths.insert({ Action_Path{trim_path, recipe, agents} });
 			}
 
-
 			std::cout << "(";
 			for (const auto& agent : agents.get()) {
 				std::cout << agent.id << ",";
@@ -120,6 +120,12 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 		}
 	}
 	return paths;
+}
+
+void Planner::update_recipe_solutions(const std::set<Action_Path>& paths) {
+	for (const auto& path : paths) {
+		recipe_solutions.at(Recipe_Agents{ path.recipe, path.agents }).add(path.joint_actions.size(), time_step);
+	}
 }
 
 bool Planner::ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const {
@@ -140,6 +146,7 @@ bool Planner::ingredients_reachable(const Recipe& recipe, const Agent_Combinatio
 			return false;
 		}
 	}
+	return true;
 }
 
 // Get all combinations of numbers/agents <n
@@ -179,7 +186,7 @@ std::vector<Agent_Combination> Planner::get_combinations(size_t n) const {
 }
 
 
-void Planner::intialize_reachables(const State& initial_state) {
+void Planner::initialize_reachables(const State& initial_state) {
 	auto combinations = get_combinations(initial_state.agents.size());
 	for (const auto& agents : combinations) {
 		Reachables reachables(environment.get_width(), environment.get_height());
@@ -207,5 +214,57 @@ void Planner::intialize_reachables(const State& initial_state) {
 			}
 		}
 		agent_reachables.insert({ agents, reachables });
+	}
+}
+
+void Planner::initialize_solutions() {
+	// TODO - Should just maintain one agent_combinations for the class
+	auto agent_combinations = get_combinations(environment.get_number_of_agents());
+	for (const auto& agents : agent_combinations) {
+		for (const auto& recipe : environment.get_all_recipes()) {
+			recipe_solutions.insert({ {recipe, agents}, {} });
+		}
+	}
+}
+
+void Planner::recognize_goals() {
+	std::vector<std::vector<float>> data_raw(time_step);
+	std::vector<std::vector<float>> data_scaled;
+	
+	// Calculate absolute value for each recipe/timestep
+	for (const auto& [recipe_Agents, history] : recipe_solutions) {
+		std::cout << static_cast<char>(recipe_Agents.recipe.result) << recipe_Agents.agents.to_string() << "\t";
+		for (float i = 0; i < time_step; ++i) {
+			if (history.get(time_step) == 0) {
+				data_raw.at(i).push_back(0);
+			} else {
+				size_t time_diff = time_step - i;
+				size_t current_solution = history.get(time_step);
+				size_t previous_solution = history.get(i);
+				//size_t result = (previous_solution - time_diff) / current_solution;
+				//data_raw.at(i).push_back((history.get(time_step) - (time_step - i)) / history.get(i));
+				data_raw.at(i).push_back(history.get(i) / (history.get(time_step) + (time_step - i)));
+			}
+		}
+	}
+	std::cout << std::endl;
+
+	// Normalize per timestep
+	for (const auto& entry : data_raw) {
+		float max_val = 1.0f;
+		//for (const auto& length : entry) max_val = std::max(max_val, length);
+		std::vector<float> scaled_row;
+		for (const auto& raw_entry : entry) {
+			scaled_row.push_back(round((raw_entry / max_val) * 1000) / 1000);
+		}
+		data_scaled.push_back(scaled_row);
+	}
+
+	// Debug print
+ 	for (const auto& data_row : data_scaled) {
+		for (const auto& data_entry : data_row) {
+			std::cout << data_entry << '\t';
+		}
+		std::cout << std::endl;
 	}
 }

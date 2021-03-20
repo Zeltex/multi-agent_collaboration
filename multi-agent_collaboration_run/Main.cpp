@@ -28,8 +28,9 @@ struct Solution {
 void solve(Environment& environment) {
 	//open-divider_salad.txt
 
-	auto paths = get_all_files("../levels/BD/");
+	//auto paths = get_all_files("../levels/BD/");
 	//std::vector<std::string> paths{ "../levels/BD/partial-divider_salad.txt" };
+	std::vector<std::string> paths{ "../levels/BD/partial-divider_tl.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/full-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_tl.txt" };
@@ -48,7 +49,7 @@ void solve(Environment& environment) {
 		while (!environment.is_done(state)) {
 			std::vector<Action> actions;
 			//for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
-			for (const auto& planner : planners) {
+			for (auto& planner : planners) {
 				actions.push_back(planner.get_next_action(state));
 			}
 			if (!environment.act(state, { actions })) {

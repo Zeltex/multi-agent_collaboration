@@ -67,6 +67,9 @@ struct Recipe {
 		if (result != other.result) return result < other.result;
 		return false;
 	}
+	bool operator!=(const Recipe& other) const {
+		return (ingredient1 != other.ingredient1 || ingredient2 != other.ingredient2 || result != other.result);
+	}
 };
 
 struct Action {
@@ -120,9 +123,10 @@ struct Agent {
 
 
 struct Agent_Combination {
-	Agent_Combination() : agents() {}
-	Agent_Combination(std::vector<Agent_Id> agents) : agents(agents) { }
+	Agent_Combination() : agents() { generate_pretty_print(); }
+	Agent_Combination(std::vector<Agent_Id> agents) : agents(agents) { generate_pretty_print(); }
 	std::vector<Agent_Id> agents;
+	std::string pretty_print;
 
 	bool operator<(const Agent_Combination& other) const {
 		if (agents.size() != other.agents.size()) return agents.size() < other.agents.size();
@@ -142,6 +146,21 @@ struct Agent_Combination {
 
 	size_t size() const {
 		return agents.size();
+	}
+
+	const std::string& to_string() const {
+		return pretty_print;
+	}
+private:
+	void generate_pretty_print() {
+		pretty_print = "(";
+		bool first = true;
+		for (const auto& agent : agents) {
+			if (first) first = false;
+			else pretty_print += ",";
+			pretty_print += std::to_string(agent.id);
+		}
+		pretty_print += ")";
 	}
 };
 
@@ -289,7 +308,8 @@ public:
 	void print_state() const;
 	void print_state(const State& state) const;
 	void play(State& state) const;
-	std::vector<Recipe> get_possible_recipes(const State& state) const;
+	std::vector<Recipe> get_possible_recipes(const State& state) const; 
+	const std::vector<Recipe>& get_all_recipes() const;
 	std::vector<Ingredient> get_goal() const;
 	bool is_done(const State& state) const;
 	size_t get_number_of_agents() const;
