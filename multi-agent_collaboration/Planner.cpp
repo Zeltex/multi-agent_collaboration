@@ -9,6 +9,7 @@
 #include <set>
 #include <deque>
 #include <numeric>
+#include <algorithm>
 
 
 
@@ -28,38 +29,67 @@ Action Planner::get_next_action(const State& state) {
 
 Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::vector<Recipe>& recipes) const {
 	
+	std::map<Recipe, Agent_Usefulnes> agent_solutions;
+
 	// Init best solutions
 	std::map<Recipe, Recipe_Solution> best_solutions;
  	for (const auto& recipe : recipes) {
-		Recipe_Solution solution { {}, (size_t)-1 };
+		Recipe_Solution solution { Agent_Combination{}, (size_t)-1 };
 		best_solutions.insert({ recipe, solution });
+		agent_solutions.insert({ recipe, Agent_Usefulnes{} });
 	}
 
-	// Note best solutions
 	for (const auto& action_path : paths) {
+		// Note best solutions
 		auto& current_solution = best_solutions.at(action_path.recipe);
 		if (current_solution > action_path) {
 			current_solution.action_count = action_path.joint_actions.size();
 			current_solution.agents = action_path.agents;
 		}
+
+		// Note usefulness of agent for recipe
+		agent_solutions.at(action_path.recipe).update(action_path, agent);
+
+		//auto& agent_solution = agent_solutions.at(action_path.recipe);
+		//if (action_path.agents.contains(agent)) {
+		//	agent_solution.incl_agent = std::min(agent_solution.incl_agent, action_path.size());
+		//} else {
+		//	agent_solution.excl_agent = std::min(agent_solution.excl_agent, action_path.size());
+		//}
 	}
+
+	for (const auto& agent_solution : agent_solutions) {
+		std::cout << agent_solution.first.result_char() << " : " 
+			<< agent_solution.second.incl_length << "/"
+			<< agent_solution.second.excl_length << " : " 
+			<< agent_solution.second.get_usefulness() << std::endl;
+	}
+
+	for (const auto& agent_solution : agent_solutions) {
+		const auto& agent_usefulness = agent_solution.second;
+		if (agent_usefulness.is_useful()) {
+			return agent_usefulness.action;
+		}
+		//if (((int)agent_solution.second.excl_agent - agent_solution.second.incl_agent) / 2 > )
+	}
+
 
 	// Find best action
-	bool done = false;
-	for (const auto& action_path : paths) {
+	//bool done = false;
+	//for (const auto& action_path : paths) {
 
-		if (!agent_in_best_solution(best_solutions, action_path)) {
-			continue;
-		}		
+	//	if (!agent_in_best_solution(best_solutions, action_path)) {
+	//		continue;
+	//	}		
 
-		if (contains_useful_action(action_path)) {
-			auto& joint_action = action_path.joint_actions.at(0);
-			std::cout << "Agent " << agent.id << " chose action " <<
-				static_cast<char>(joint_action.actions.at(agent.id).direction) <<
-				" for subtask " << static_cast<char>(action_path.recipe.result) << std::endl;
-			return joint_action.actions.at(agent.id);
-		}
-	}
+	//	if (action_path.contains_useful_action()) {
+	//		auto& joint_action = action_path.joint_actions.at(0);
+	//		std::cout << "Agent " << agent.id << " chose action " <<
+	//			static_cast<char>(joint_action.actions.at(agent.id).direction) <<
+	//			" for subtask " << static_cast<char>(action_path.recipe.result) << std::endl;
+	//		return joint_action.actions.at(agent.id);
+	//	}
+	//}
 	std::cout << "Agent " << agent.id << " did not find useful action " << std::endl;
 	return { Direction::NONE, { agent } };
 }
@@ -67,15 +97,6 @@ Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::v
 bool Planner::agent_in_best_solution(const std::map<Recipe, Recipe_Solution>& best_solutions, const Action_Path& action_path) const {
 	auto& best_agents = best_solutions.at(action_path.recipe).agents;
 	return best_agents.contains(agent);
-}
-
-bool Planner::contains_useful_action(const Action_Path& action_path) const {
-	for (const auto& action : action_path.joint_actions) {
-		if (action.actions.at(agent.id).direction != Direction::NONE) {
-			return true;
-		}
-	}
-	return false;
 }
 
 std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& state) const {
@@ -92,10 +113,10 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 				continue;
 			}
 
-			Search search(std::make_unique<A_Star>());
+			Search search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT));
 
 			auto time_start = std::chrono::system_clock::now();
-			auto path = search.search_joint(state, environment, recipe, agents, INITIAL_DEPTH_LIMIT);
+			auto path = search.search_joint(state, recipe, agents, {});
 			auto time_end = std::chrono::system_clock::now();
 
 			auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
@@ -108,7 +129,7 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 				trim.trim(trim_path, state, environment, recipe);
 
 
-				paths.insert({ Action_Path{trim_path, recipe, agents} });
+				paths.insert({ Action_Path{trim_path, recipe, agents, agent} });
 			}
 
 			std::cout << "(";
@@ -117,6 +138,22 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 			}
 			std::cout << ") : " << trim_path.size() << " : " << static_cast<char>(recipe.result) <<  " : " << diff << std::endl;
 
+			if (agents.size() > 1) {
+				for (const auto& temp_agent : agents.get()) {
+					time_start = std::chrono::system_clock::now();
+					path = search.search_joint(state, recipe, agents, temp_agent);
+					time_end = std::chrono::system_clock::now();
+					diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
+
+					Action_Path a_path{ path, recipe, agents, agent };
+					std::cout << agents.to_string() << "/" 
+						<< temp_agent.to_string() << " : " 
+						<< a_path.first_action_string() << "-" 
+						<< a_path.last_action_string() << " : " 
+						<< recipe.result_char() << " : " 
+						<< diff << std::endl;
+				}
+			}
 		}
 	}
 	return paths;

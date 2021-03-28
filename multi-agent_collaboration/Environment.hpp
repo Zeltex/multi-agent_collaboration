@@ -7,6 +7,7 @@
 #include <utility>
 #include <string>
 #include <optional>
+#include <iostream>
 
 using Coordinate = std::pair<size_t, size_t> ;
 
@@ -21,6 +22,9 @@ struct Agent_Id {
 	}
 	bool operator<(const Agent_Id& other) const {
 		return this->id < other.id;
+	}
+	std::string to_string() const {
+		return std::to_string(id);
 	}
 };
 
@@ -70,15 +74,24 @@ struct Recipe {
 	bool operator!=(const Recipe& other) const {
 		return (ingredient1 != other.ingredient1 || ingredient2 != other.ingredient2 || result != other.result);
 	}
+	char result_char() const {
+		return static_cast<char>(result);
+	}
 };
 
 struct Action {
+	Action() : direction(Direction::NONE), agent(EMPTY_VAL) {};
 	Action(Direction direction, Agent_Id agent) : direction(direction), agent(agent) {};
 	Direction direction;
 	Agent_Id agent;
+
+	std::string to_string() const {
+		return std::to_string(static_cast<char>(direction)) + std::to_string(agent.id);
+	}
 };
 
 struct Joint_Action {
+	Joint_Action() : actions() {};
 	Joint_Action(std::vector<Action> actions) : actions(actions) {};
 
 	std::vector<Action> actions;
@@ -92,6 +105,28 @@ struct Joint_Action {
 				return;
 			}
 		}
+	}
+
+	bool is_action_useful(Agent_Id agent) const {
+		if (actions.size() <= agent.id)  return false;
+		return actions.at(agent.id).direction != Direction::NONE;
+	}
+
+	Action get_action(Agent_Id agent) const {
+		if (actions.size() <= agent.id) {
+			std::cerr << "Attempting to get action for agent " << agent.id << ", but action length is " << actions.size() << std::endl;
+			for (const auto& action : actions) {
+				std::cerr << action.to_string() << " ";
+			}
+			std::cerr << std::endl;
+			throw std::runtime_error("Invalid get action");
+		}
+		return actions.at(agent.id);
+	}
+
+	// false if handoff action
+	bool is_action_valid() const {
+		return !actions.empty();
 	}
 };
 
@@ -118,6 +153,12 @@ struct Agent {
 	}
 	void move_to(Coordinate coordinate) {
 		this->coordinate = coordinate;
+	}
+	void print_compact(Agent_Id id) const {
+		std::cout << "(" << id.id << ", " << coordinate.first << ", " << coordinate.second << ") ";
+		if (item.has_value()) {
+			std::cout << "(" << static_cast<char>(item.value()) << ", " << coordinate.first << ", " << coordinate.second << ") ";
+		}
 	}
 };
 
@@ -148,6 +189,10 @@ struct Agent_Combination {
 		return agents.size();
 	}
 
+	bool empty() const {
+		return agents.empty();
+	}
+
 	const std::string& to_string() const {
 		return pretty_print;
 	}
@@ -169,6 +214,7 @@ struct State {
 	std::map<Coordinate, Ingredient> items;
 	std::vector<std::pair<Coordinate, Ingredient>> goal_items;
 	std::vector<Agent> agents;
+
 	std::optional<Ingredient> get_ingredient_at_position(Coordinate coordinate) const {
 		auto it = items.find(coordinate);
 		if (it != items.end()) {
@@ -273,6 +319,17 @@ struct State {
 			}
 		}
 		return result;
+	}
+
+	void print_compact() const {
+		for (const auto& item : items) {
+			std::cout << "(" << static_cast<char>(item.second) << ", " << item.first.first << ", " << item.first.second << ") ";
+		}
+		size_t agent_counter = 0;
+		for (const auto& agent : agents) {
+			agent.print_compact({ agent_counter });
+			++agent_counter;
+		}
 	}
 };
 

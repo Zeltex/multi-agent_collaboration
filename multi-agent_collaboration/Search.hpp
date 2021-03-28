@@ -56,25 +56,24 @@ namespace std {
 
 class Search_Method {
 public:
-	virtual std::vector<Joint_Action> search_joint(const State& state, const Environment& environment,
-		Recipe recipe, const Agent_Combination& agents, size_t depth_limit) const = 0;
-	virtual std::vector<Joint_Action> search_joint(const State& state, const Environment& environment,
-		Recipe recipe, const Agent_Combination& agents) const = 0;
+	Search_Method(Environment environment, size_t depth_limit) : environment(environment), depth_limit(depth_limit) {}
+	virtual std::vector<Joint_Action> search_joint(const State& state,
+		Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) const = 0;
 protected:
 		template<typename T>
 		std::vector<Joint_Action> extract_actions(size_t goal_id, const std::vector<T>& states) const;
+
+		Environment environment;
+		size_t depth_limit;
 };
 
 class Search {
 public:
-	Search(std::unique_ptr<Search_Method> search_method) :search_method(std::move(search_method)) {};
-	std::vector<Joint_Action> search_joint(const State& state, const Environment& environment,
-		Recipe recipe, const Agent_Combination& agents, size_t depth_limit) const {
-		return search_method->search_joint(state, environment, recipe, agents, depth_limit);
-	}
-	std::vector<Joint_Action> search_joint(const State& state, const Environment& environment,
-		Recipe recipe, const Agent_Combination& agents) const {
-		return search_method->search_joint(state, environment, recipe, agents);
+	// TODO - Probably delete copy constructor and more
+	Search(std::unique_ptr<Search_Method> search_method) : search_method(std::move(search_method)) {};
+	std::vector<Joint_Action> search_joint(const State& state,
+		Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) const {
+		return search_method->search_joint(state, recipe, agents, handoff_agent);
 	}
 private:
 	std::unique_ptr<Search_Method> search_method;

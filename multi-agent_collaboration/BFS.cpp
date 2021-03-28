@@ -4,14 +4,15 @@
 #include <unordered_set>
 #include <queue>
 #include <iostream>
+#include <stdexcept>
 
-std::vector<Joint_Action> BFS::search_joint(const State& original_state, const Environment& environment,
-	Recipe recipe, const Agent_Combination& agents) const {
-	return search_joint(original_state, environment, recipe, agents, (size_t)-1);
-}
+std::vector<Joint_Action> BFS::search_joint(const State& state,
+	Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) const {
 
-std::vector<Joint_Action> BFS::search_joint(const State& state, const Environment& environment,
-	Recipe recipe, const Agent_Combination& agents, size_t depth_limit) const {
+	if (handoff_agent.has_value()) {
+		throw std::runtime_error("Handoff agent not supported for bfs");
+	}
+
 	Search_Joint_State dummy(state, { { } }, 0, 0);
 	std::unordered_set<Search_Joint_State> visited;
 	std::vector<Search_Joint_State> path;

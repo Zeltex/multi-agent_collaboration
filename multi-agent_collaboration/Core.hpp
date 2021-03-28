@@ -15,3 +15,4 @@ enum class Print_Level {
 void print(Print_Level level, const std::string& msg);
 
 #define PRINT(level, msg) print(level, msg)
+#define EMPTY_VAL (size_t)-1
