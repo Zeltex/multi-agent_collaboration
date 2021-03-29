@@ -145,6 +145,15 @@ struct Agent {
 	bool operator!= (const Agent& other) const {
 		return !(*this == other);
 	}
+	bool operator< (const Agent& other) const {
+		if (coordinate < other.coordinate) return true;
+		if (coordinate > other.coordinate) return false;
+		if (item.has_value() && !other.item.has_value()) return true;
+		if (!item.has_value() && other.item.has_value()) return true;
+		if (item.value() < other.item.value()) return true;
+		if (item.value() > other.item.value()) return false;
+		return false;
+	}
 	void clear_item() {
 		item = {};
 	}
@@ -215,6 +224,21 @@ struct State {
 	std::vector<std::pair<Coordinate, Ingredient>> goal_items;
 	std::vector<Agent> agents;
 
+	bool operator<(const State& other) const {
+		std::cout << "<state" << std::endl;
+		if (this->items.size() != other.items.size()) return this->items.size() < other.items.size();
+		if (this->goal_items.size() != other.goal_items.size()) return this->goal_items.size() < other.goal_items.size();
+		if (this->agents.size() != other.agents.size()) return this->agents.size() < other.agents.size();
+
+		if (this->items < other.items) return true;
+		if (this->items > other.items) return false;
+		if (this->goal_items < other.goal_items) return true;
+		if (this->goal_items > other.goal_items) return false;
+		if (this->agents < other.agents) return true;
+		//if (this->agents > other.agents) return false;
+		return false;
+	}
+
 	std::optional<Ingredient> get_ingredient_at_position(Coordinate coordinate) const {
 		auto it = items.find(coordinate);
 		if (it != items.end()) {
@@ -274,7 +298,7 @@ struct State {
 		items.erase(items.find(coordinate));
 	}
 
-	size_t to_hash() const {
+	std::string to_hash_string() const {
 		std::string hash;
 		hash += std::to_string(items.size() * 128 + agents.size());
 		for (const auto& item : items) {
@@ -289,7 +313,11 @@ struct State {
 			}
 			hash += "0";
 		}
-		return std::hash<std::string>()(hash);
+		return hash;
+	}
+
+	size_t to_hash() const {
+		return std::hash<std::string>()(this->to_hash_string());
 	}
 
 	bool operator==(const State& other) const {
@@ -331,6 +359,8 @@ struct State {
 			++agent_counter;
 		}
 	}
+
+
 };
 
 namespace std {

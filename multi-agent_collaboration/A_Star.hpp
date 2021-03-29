@@ -3,20 +3,117 @@
 #include <algorithm>
 #include <queue>
 #include <unordered_set>
+#include <memory>
 
 #include "Environment.hpp"
 #include "Search.hpp"
 
 struct Node {
-	Node(size_t state_id, size_t g, size_t h, size_t action_count) : 
-		state_id(state_id), g(g), h(h), action_count(action_count){};
+
+	Node(const Node* other, const size_t& pass_time) {
+		init(other);
+		this->pass_time = pass_time;
+		this->parent = other;
+	}
+
+	Node(const Node* other) {
+		init(other);
+		this->parent = other;
+	}
+
+	Node(State state, size_t id, size_t g, size_t h, size_t action_count,
+		size_t pass_time, Node* parent, Joint_Action action, bool closed)
+		: state(state), id(id), g(g), h(h), action_count(action_count),
+		pass_time(pass_time), parent(parent), action(action), closed(closed){};
+	//Node(size_t state_id, size_t g, size_t h, size_t action_count) : 
+	//	state_id(state_id), g(g), h(h), action_count(action_count){};
 		
-	size_t state_id;
+	void init(const Node* other) {
+		this->state = other->state;
+		this->id = other->id;
+		this->g = other->g;
+		this->h = other->h;
+		this->action_count = other->action_count;
+		this->parent = other->parent;
+		this->action = other->action;
+		this->closed = other->closed;
+		this->pass_time = other->pass_time;
+		this->hash = EMPTY_VAL;
+	}
+
+	State state;
+	size_t id;
 	size_t g;
 	size_t h;
 	size_t f() const { return g + h; }
 	size_t action_count;
+	size_t pass_time;
+	const Node* parent;
+	Joint_Action action;
+	bool closed;
+
+	// For debug purposes
+	size_t hash;
+	void calculate_hash() {
+		this->hash = to_hash();
+	}
+
+	bool set_equals(const Node* other) const {
+		return this->state == other->state;
+	}
+
+	size_t to_hash() const {
+		std::string pass_string = (pass_time == EMPTY_VAL ? "0" : "1");
+		return std::hash<std::string>()(state.to_hash_string() + pass_string);
+	}
+
+	bool has_agent_passed() const {
+		return pass_time != EMPTY_VAL;
+	}
+
+	bool operator<(const Node* other) const {
+		std::cout << "<node" << std::endl;
+		return this->state < other->state;
+	}
+
+	// Used to determine if a shorter path has been found (assumes this->stae == other->state)
+	bool is_shorter(const Node* other) const {
+		if (this->g != other->g) {
+			return this->g < other->g;
+		}
+
+		if (this->action_count != other->action_count) {
+			return this->action_count < other->action_count;
+		}
+
+		if (this->pass_time != EMPTY_VAL && other->pass_time != EMPTY_VAL) {
+			return this->pass_time < other->pass_time;
+		}
+
+		return false;
+	}
+
+	// TODO - Check if more fields should be updated
+	// Used to update node when shorter path has been found
+	void update(const Node* other) {
+		this->g = other->g;
+		this->action_count = other->action_count;
+		this->parent = other->parent;
+		this->action = other->action;
+	}
 };
+
+namespace std {
+	template<>
+	struct hash<Node*>
+	{
+		size_t
+			operator()(const Node* obj) const
+		{
+			return obj->to_hash();
+		}
+	};
+}
 
 struct State_Hash {
 	State_Hash(State state, size_t state_id, bool has_passed) 
@@ -78,15 +175,6 @@ struct State_Info {
 	}
 };
 
-struct Node_Comparator {
-	bool operator()(const Node& lhs, const Node& rhs) const {
-		if (lhs.f() != rhs.f()) return lhs.f() > rhs.f();
-		if (lhs.g != rhs.g) return lhs.g > rhs.g;
-		if (lhs.action_count != rhs.action_count) return lhs.action_count > rhs.action_count;
-		return false;
-	}
-};
-
 // Could optimise some by calculating distance from all ingredients to nearest agent
 // and using this in combination with the location1/location2 nested for loops
 #define INFINITE_HEURISTIC 1000
@@ -142,22 +230,64 @@ struct Heuristic {
 	Agent_Combination agents;
 };
 
-using Node_Queue = std::priority_queue<Node, std::vector<Node>, Node_Comparator>;
+
+struct Node_Queue_Comparator {
+	bool operator()(const Node* lhs, const Node* rhs) const {
+		if (lhs->f() != rhs->f()) return lhs->f() > rhs->f();
+		if (lhs->g != rhs->g) return lhs->g > rhs->g;
+		if (lhs->action_count != rhs->action_count) return lhs->action_count > rhs->action_count;
+		return false;
+	}
+};
+
+struct Node_Hasher {
+	bool operator()(const Node* node) const {
+		return node->to_hash();
+	}
+};
+
+struct Node_Set_Comparator {
+	bool operator()(const Node* lhs, const Node* rhs) const {
+		return lhs->set_equals(rhs);
+	}
+};
+
+
+using Node_Queue = std::priority_queue<Node*, std::vector<Node*>, Node_Queue_Comparator>;
+using Node_Set = std::unordered_set<Node*, Node_Hasher, Node_Set_Comparator>;
 
 class A_Star : public Search_Method {
 public:
 	using Search_Method::Search_Method;
-	std::vector<Joint_Action> search_joint(const State& state, 
-		Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) const override;
+	std::vector<Joint_Action> search_joint(const State& state, Recipe recipe, 
+		const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) const override;
 private:
-	size_t get_action_cost(const Joint_Action& action) const;
-	void print_current(size_t current_state_id, const std::vector<State_Info>& states, const State_Info& current_state) const;
-	void initialize_variables(std::priority_queue<Node, std::vector<Node>, Node_Comparator>& frontier,
-		std::unordered_set<State_Hash>& visited, std::vector<State_Info>& states, std::vector<bool>& closed, Heuristic& heuristic, const State& original_state) const;
-	bool is_being_passed(const std::optional<Agent_Id>& handoff_agent, const Joint_Action& action, const State_Info& current_state_info) const;
-	std::vector<Joint_Action> get_actions(const Agent_Combination& agents, bool has_handoff_agent) const;
-	std::optional<size_t> get_next_state(Node_Queue& frontier, std::vector<bool>& closed) const;
-	std::pair<bool, State_Info > check_and_perform(const Joint_Action& action, const State_Info& current_state_info, const size_t& current_state_id, const std::optional<Agent_Id>& handoff_agent) const;
+	size_t	get_action_cost(const Joint_Action& action) const;
+	
+	Node*	get_next_node(Node_Queue& frontier) const;
+	
+	void	initialize_variables(Node_Queue& frontier, Node_Set& visited,
+		Heuristic& heuristic, const State& original_state) const;
+	
+	bool	is_being_passed(const std::optional<Agent_Id>& handoff_agent, const Joint_Action& action, 
+		const Node* current_node) const;
+	
+	bool	is_invalid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, 
+		const std::optional<Agent_Id>& handoff_agent) const;
+
+	bool	is_valid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, 
+		const std::optional<Agent_Id>& handoff_agent) const;
+	
+	void	print_current(size_t current_state_id, const std::vector<State_Info>& states, 
+		const State_Info& current_state) const;
+	
+	std::vector<Joint_Action> get_actions(const Agent_Combination& agents, 
+		bool has_handoff_agent) const;
+		
+	std::pair<bool, std::unique_ptr<Node>> check_and_perform(const Joint_Action& action, const Node* current_node, 
+		const std::optional<Agent_Id>& handoff_agent) const;
+	
+	std::vector<Joint_Action> extract_actions(const Node* node) const;
 
 	//std::vector<Joint_Action> extract_actions(size_t goal_id, const std::vector<State_Info>& states) const;
 };
