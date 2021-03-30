@@ -1,4 +1,8 @@
 #pragma once
+
+#define _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING 1
+#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS 1
+
 #include <vector>
 #include <algorithm>
 #include <queue>
@@ -7,12 +11,14 @@
 
 #include "Environment.hpp"
 #include "Search.hpp"
+#include "boost/pool/pool.hpp"
 
 struct Node {
+	Node() {};
 
-	Node(const Node* other, const size_t& pass_time) {
+	Node(const Node* other, const size_t& id) {
 		init(other);
-		this->pass_time = pass_time;
+		this->id = id;
 		this->parent = other;
 	}
 
@@ -41,6 +47,19 @@ struct Node {
 		this->hash = EMPTY_VAL;
 	}
 
+	//void init(State state, size_t id, size_t g, size_t h, size_t action_count,
+	//	size_t pass_time, Node* parent, Joint_Action action, bool closed) {
+	//	this->state = state;
+	//	this->id = id;
+	//	this->g = g; 
+	//	this->h = h;
+	//	this->action_count = action_count;
+	//	this->pass_time = pass_time;
+	//	this->parent = parent;
+	//	this->action = action;
+	//	this->closed = closed;
+	//}
+
 	State state;
 	size_t id;
 	size_t g;
@@ -59,7 +78,7 @@ struct Node {
 	}
 
 	bool set_equals(const Node* other) const {
-		return this->state == other->state;
+		return this->state == other->state && this->pass_time == other->pass_time;
 	}
 
 	size_t to_hash() const {
@@ -96,6 +115,9 @@ struct Node {
 	// TODO - Check if more fields should be updated
 	// Used to update node when shorter path has been found
 	void update(const Node* other) {
+		if (this->id == other->parent->id) {
+			size_t dummy = 0;
+		}
 		this->g = other->g;
 		this->action_count = other->action_count;
 		this->parent = other->parent;
@@ -179,8 +201,10 @@ struct State_Info {
 // and using this in combination with the location1/location2 nested for loops
 #define INFINITE_HEURISTIC 1000
 struct Heuristic {
-	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2, const Agent_Combination& agents)
-		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2),  agents(agents) {};
+	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2, 
+		const Agent_Combination& agents, const std::optional<Agent_Id>& handoff_agent)
+		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2),  
+		agents(agents), handoff_agent(handoff_agent) {};
 
 	size_t euclidean(Coordinate location1, Coordinate location2) const {
 		return (size_t) (std::abs((int)location1.first - (int)location2.first)
@@ -201,24 +225,27 @@ struct Heuristic {
 			}
 		}
 		size_t min_agent_dist = (size_t)-1;
-		if (!environment.is_type_stationary(ingredient1)) {
-			for (const auto& location1 : locations1) {
-				for (const auto& agent_id : agents.get()) {
-					const auto& agent = state.agents.at(agent_id.id);
+		for (const auto& agent_id : agents.get()) {
+			if (handoff_agent.has_value() && agent_id == handoff_agent.value()) {
+				continue;
+			}
+			const auto& agent = state.agents.at(agent_id.id);
+			if (!environment.is_type_stationary(ingredient1)) {
+				for (const auto& location1 : locations1) {
 					min_agent_dist = std::min(min_agent_dist, euclidean(location1, agent.coordinate));
+
 				}
 			}
-		}
-		if (!environment.is_type_stationary(ingredient2)) {
-			for (const auto& location2 : locations2) {
-				for (const auto& agent_id : agents.get()) {
-					const auto& agent = state.agents.at(agent_id.id);
+			if (!environment.is_type_stationary(ingredient2)) {
+				for (const auto& location2 : locations2) {
 					min_agent_dist = std::min(min_agent_dist, euclidean(location2, agent.coordinate));
+
 				}
 			}
 		}
 		if (min_dist == (size_t)-1) min_dist = 0;
 		if (min_agent_dist == (size_t)-1) min_agent_dist = 0;
+		else if (min_agent_dist > 0) --min_agent_dist;
 
 
 		return min_dist + min_agent_dist;
@@ -228,6 +255,7 @@ struct Heuristic {
 	Ingredient ingredient1; 
 	Ingredient ingredient2;
 	Agent_Combination agents;
+	std::optional<Agent_Id> handoff_agent;
 };
 
 
@@ -255,6 +283,8 @@ struct Node_Set_Comparator {
 
 using Node_Queue = std::priority_queue<Node*, std::vector<Node*>, Node_Queue_Comparator>;
 using Node_Set = std::unordered_set<Node*, Node_Hasher, Node_Set_Comparator>;
+using Node_Ref = std::deque<Node>;
+using Pool = boost::pool<>;
 
 class A_Star : public Search_Method {
 public:
@@ -266,8 +296,8 @@ private:
 	
 	Node*	get_next_node(Node_Queue& frontier) const;
 	
-	void	initialize_variables(Node_Queue& frontier, Node_Set& visited,
-		Heuristic& heuristic, const State& original_state) const;
+	void	initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes,
+		Heuristic& heuristic, const State& original_state, Pool& pool) const;
 	
 	bool	is_being_passed(const std::optional<Agent_Id>& handoff_agent, const Joint_Action& action, 
 		const Node* current_node) const;
@@ -278,14 +308,14 @@ private:
 	bool	is_valid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, 
 		const std::optional<Agent_Id>& handoff_agent) const;
 	
-	void	print_current(size_t current_state_id, const std::vector<State_Info>& states, 
-		const State_Info& current_state) const;
+	void	print_current(const Node* node) const;
 	
 	std::vector<Joint_Action> get_actions(const Agent_Combination& agents, 
 		bool has_handoff_agent) const;
 		
-	std::pair<bool, std::unique_ptr<Node>> check_and_perform(const Joint_Action& action, const Node* current_node, 
-		const std::optional<Agent_Id>& handoff_agent) const;
+	std::pair<bool, Node*> check_and_perform(const Joint_Action& action, Node_Ref& nodes,
+		const Node* current_node, const std::optional<Agent_Id>& handoff_agent,
+		Heuristic& heuristic, Pool& pool) const;
 	
 	std::vector<Joint_Action> extract_actions(const Node* node) const;
 

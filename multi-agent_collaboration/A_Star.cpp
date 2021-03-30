@@ -4,19 +4,23 @@
 #include <unordered_set>
 #include <iostream>
 
+
 std::vector<Joint_Action> A_Star::search_joint(const State& original_state, 
 		Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) const {
 
 	//std::cout << "\n\nStarting search " << recipe.result_char() << " " << agents.to_string() << (handoff_agent.has_value() ? "/" + std::to_string(handoff_agent.value().id) : "") << "\n" << std::endl;
 
-	Node_Queue frontier;												// Open list
-	Node_Set visited;									// State lookup	
+	Pool pool(sizeof(Node));
 
-	Heuristic heuristic(environment, recipe.ingredient1, recipe.ingredient2, agents);
+	Node_Queue frontier;
+	Node_Set visited;
+	Node_Ref nodes;
+
+	Heuristic heuristic(environment, recipe.ingredient1, recipe.ingredient2, agents, handoff_agent);
 	Node* goal_node = nullptr;
 	auto actions = get_actions(agents, handoff_agent.has_value());
 
-	initialize_variables(frontier, visited, heuristic, original_state);
+	initialize_variables(frontier, visited, nodes, heuristic, original_state, pool);
 
 	while (goal_node == nullptr) {
 
@@ -27,59 +31,66 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 		}
 
 		// Exceeded depth limit
-		if (current_node->g >= depth_limit) {
+		if (current_node->f() >= depth_limit) {
 			continue;
 		}
 
-		//print_current(current_state_id, states, current_state_info);
+		//print_current(current_node);
 
 		for (const auto& action : actions) {
 
 			// Perform action if valid
-			auto [action_valid, new_node] = check_and_perform(action, current_node, handoff_agent);
+			auto [action_valid, new_node] = check_and_perform(action, nodes, current_node, handoff_agent, heuristic, pool);
 			if (!action_valid) {
 				continue;
 			}
 
-			auto visited_it = visited.find(new_node.get());
+			auto visited_it = visited.find(new_node);
 
 			if (visited_it != visited.end()) {
 				if (new_node->is_shorter(*visited_it)) {
 					// Faster path found to already expanded node
 					if ((*visited_it)->closed && new_node->g != (*visited_it)->g) {
+						std::cout << "Printing new_node/new_node_parent/it/it_parent" << std::endl;
+						print_current(new_node);
+						print_current(new_node->parent);
+						print_current(*visited_it);
+						print_current((*visited_it)->parent);
 						throw std::runtime_error("Heuristic is not consistent");
 
 					// Faster path found
 					} else {
-						(*visited_it)->update(new_node.get());
+						(*visited_it)->update(new_node);
 					}
-				} 
+				}
+				nodes.pop_back();
 
 			// New state
 			} else {
-				auto new_node_ptr = new_node.release();
-				visited.insert(new_node_ptr);
+				visited.insert(new_node);
 
 				// Goal state which does NOT satisfy handoff_agent
-				if (is_invalid_goal(new_node_ptr, recipe, action, handoff_agent)) {
-					new_node_ptr->closed = true;
+				if (is_invalid_goal(new_node, recipe, action, handoff_agent)) {
+					new_node->closed = true;
 
 				// Goal state which DOES satisfy handoff_agent
-				} else if (is_valid_goal(new_node_ptr, recipe, action, handoff_agent)) {
-					goal_node = new_node_ptr;
+				} else if (is_valid_goal(new_node, recipe, action, handoff_agent)) {
+					goal_node = new_node;
 
 				// Non-goal state
 				} else {
-					frontier.push(new_node_ptr);
+					frontier.push(new_node);
 				}
 			}
 		}
 	}
 	auto result_actions = extract_actions(goal_node);
 	
-	for (auto it : visited) {
-		delete it;
-	}
+	//if (agents.size() == 1 && agents.contains(Agent_Id{ 1 })) {
+	//	for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+	//		print_current(&(*it));
+	//	}
+	//}
 
 	return result_actions;
 }
@@ -106,45 +117,48 @@ bool A_Star::is_valid_goal(const Node* node, const Recipe& recipe, const Joint_A
 				&& !action.is_action_useful(handoff_agent.value())));
 }
 
-void A_Star::print_current(size_t current_state_id, const std::vector<State_Info>& states, const State_Info& current_state_info) const {
-	std::cout << "State " << current_state_id << ", Parent " << states.at(current_state_id).parent_id << " ";
-	current_state_info.state.print_compact();
+void A_Star::print_current(const Node* node) const {
+	std::cout << "Node " << node->id << ", Parent " << (node->parent == nullptr ? "-" : std::to_string(node->parent->id)) << " ";
+	node->state.print_compact();
 	std::cout << std::endl;
 }
 
-std::pair<bool, std::unique_ptr<Node>> A_Star::check_and_perform(const Joint_Action& action, const Node* current_node, const std::optional<Agent_Id>& handoff_agent) const {
+std::pair<bool, Node*> A_Star::check_and_perform(const Joint_Action& action, Node_Ref& nodes, const Node* current_node, const std::optional<Agent_Id>& handoff_agent, Heuristic& heuristic, Pool& pool) const {
 	
 	// Useful action from handoff agent after handoff
 	if (current_node->has_agent_passed() && handoff_agent.has_value() && action.is_action_useful(handoff_agent.value())) {
-		return { false, std::unique_ptr<Node>() };
+		return { false, nullptr };
 	}
+	nodes.emplace_back(current_node, nodes.size());
+	auto new_node = &nodes.back();
 
 	// Handoff action, simply change handoff status
 	if (!action.is_action_valid()) {
-		std::unique_ptr<Node> new_node = std::make_unique<Node>(current_node, current_node->g);
+		new_node->g = current_node->g;
+		new_node->pass_time = current_node->g;
 		new_node->calculate_hash();
-		return { true, std::move(new_node) };
+		return { true, new_node };
 	}
 
 	// Action is illegal or causes no change
-	auto new_node = std::make_unique<Node>(current_node);
 	if (!environment.act(new_node->state, action, Print_Level::NOPE)) {
-		return { false, std::unique_ptr<Node>() };
+		nodes.pop_back();
+		return { false, nullptr };
 	}
 
 	// Action performed
-	new_node->parent = current_node;
 	new_node->action = action;
 	new_node->g += 1;
 	new_node->action_count += get_action_cost(action);
 	new_node->closed = false;
+	new_node->h = heuristic(new_node->state);
 
 	// TODO - Probably don't need this on account of the second if statement in this method
 	if (!new_node->has_agent_passed() && is_being_passed(handoff_agent, action, current_node)) {
 		new_node->pass_time = new_node->g;
 	}
 	new_node->calculate_hash();
-	return { true, std::move(new_node) };
+	return { true, new_node };
 }
 
 size_t A_Star::get_action_cost(const Joint_Action& joint_action) const {
@@ -159,7 +173,7 @@ bool A_Star::is_being_passed(const std::optional<Agent_Id>& handoff_agent, const
 	return handoff_agent.has_value() && !action.is_action_useful(handoff_agent.value());
 }
 
-void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited,	Heuristic& heuristic, const State& original_state) const {
+void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes, Heuristic& heuristic, const State& original_state, Pool& pool) const {
 
 	constexpr size_t id = 0;
 	constexpr size_t g = 0;
@@ -170,8 +184,8 @@ void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited,	Heuri
 	Joint_Action action;
 	size_t h = heuristic(original_state);
 
-	Node* node = new Node(original_state, id, g, h, action_count, pass_time, parent, action, closed);
-
+	nodes.emplace_back(original_state, id, g, h, action_count, pass_time, parent, action, closed);
+	auto node = &nodes.back();
 	node->calculate_hash();
 	frontier.push(node);
 	visited.insert(node);
