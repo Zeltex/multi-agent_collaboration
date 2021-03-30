@@ -383,6 +383,7 @@ public:
 		number_of_agents(number_of_agents), goal_names(), agents_initial_positions(), walls(), 
 		cutting_stations(), delivery_stations(), width(), height() {};
 
+	bool is_inbound(const Coordinate& coordiante) const;
 	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
 	bool is_type_stationary(Ingredient ingredient) const;
 	bool act(State& state, const Action& action) const;

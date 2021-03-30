@@ -5,6 +5,14 @@
 #include <algorithm>
 #include <set>
 
+
+bool Environment::is_inbound(const Coordinate& coordinate) const {
+	return coordinate.first >= 0
+		&& coordinate.second >= 0
+		&& coordinate.first < width
+		&& coordinate.second < height;
+}
+
 bool Environment::is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const {
 	switch (type) {
 	case Cell_Type::WALL: {
@@ -24,7 +32,7 @@ bool Environment::is_cell_type(const Coordinate& coordinate, const Cell_Type& ty
 	exit(-1);
 	return false;
 }
-constexpr bool Environment::is_type_stationary(Ingredient ingredient) const {
+bool Environment::is_type_stationary(Ingredient ingredient) const {
 	switch (ingredient) {
 	case Ingredient::CUTTING: return true;
 	case Ingredient::DELIVERY: return true;

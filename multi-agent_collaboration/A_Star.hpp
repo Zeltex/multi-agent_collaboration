@@ -197,17 +197,37 @@ struct State_Info {
 	}
 };
 
+struct Distances {
+	Distances(size_t width, size_t height) 
+		: distances(width*height, std::vector<size_t>(width*height, EMPTY_VAL)), 
+		width(width), height(height) {};
+	std::vector<std::vector<size_t>> distances;
+	size_t width;
+	size_t height;
+	constexpr size_t convert(const Coordinate& coord1) const {
+		return coord1.first * height + coord1.second;
+	}
+
+	const size_t& const_at(Coordinate coord1, Coordinate coord2) const {
+		return distances.at(convert(coord1)).at(convert(coord2));
+	}
+
+	size_t& at(Coordinate coord1, Coordinate coord2) {
+		return distances.at(convert(coord1)).at(convert(coord2));
+	}
+};
+
 // Could optimise some by calculating distance from all ingredients to nearest agent
 // and using this in combination with the location1/location2 nested for loops
 #define INFINITE_HEURISTIC 1000
 struct Heuristic {
-	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2, 
+	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2,
 		const Agent_Combination& agents, const std::optional<Agent_Id>& handoff_agent)
-		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2),  
+		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2),
 		agents(agents), handoff_agent(handoff_agent) {};
 
 	size_t euclidean(Coordinate location1, Coordinate location2) const {
-		return (size_t) (std::abs((int)location1.first - (int)location2.first)
+		return (size_t)(std::abs((int)location1.first - (int)location2.first)
 			+ std::abs((int)location1.second - (int)location2.second));
 	}
 	size_t operator()(const State& state) {
@@ -250,6 +270,103 @@ struct Heuristic {
 
 		return min_dist + min_agent_dist;
 	}
+	struct Search_Entry {
+		Search_Entry(Coordinate coord, size_t dist, size_t walls) : coord(coord), dist(dist), walls(walls) {}
+		Coordinate coord;
+		size_t dist;
+		size_t walls;
+	};
+	size_t convert(const Coordinate& coord1) const {
+		return coord1.first * environment.get_height() + coord1.second;
+	}
+
+	void print_distances(Coordinate coordinate, size_t agent_number) const {
+		std::cout << "\nPrinting distances for " << agent_number << " agents from (" << coordinate.first << ", " << coordinate.second << ")" << std::endl;
+		for (size_t y = 0; y < environment.get_height(); ++y) {
+			for (size_t x = 0; x < environment.get_width(); ++x) {
+				const auto& temp = distances.at(agent_number-1).const_at(coordinate, { x,y });
+				std::cout << (temp == EMPTY_VAL ? "--" : (temp < 10 ? "0" : "") + std::to_string(temp)) << " ";
+			}
+			std::cout << std::endl;
+		}
+	}
+
+	// All pairs shortest path for all amounts of agents, taking wall-handover in to account
+	void init(size_t amount_of_agents) {
+		// Get all possible coordinates
+		std::vector<Coordinate> coordinates;
+		for (size_t x = 0; x < environment.get_width(); ++x) {
+			for (size_t y = 0; y < environment.get_height(); ++y) {
+				coordinates.emplace_back(x, y);
+			}
+		}
+
+		// Loop agent sizes
+		for (size_t current_agents = 0; current_agents < amount_of_agents; ++current_agents) {
+			size_t max_walls = current_agents;
+			distances.emplace_back(environment.get_width(), environment.get_height());
+			auto& final_dist = distances.back();
+			
+			// Loop all source coordiantes
+			for (const auto& source : coordinates) {
+				std::vector<std::vector<size_t>> temp_distances(
+					amount_of_agents, std::vector<size_t>(environment.get_width() * environment.get_height(), EMPTY_VAL));
+
+				Search_Entry origin{ source, 0, 0 };
+				std::deque<Search_Entry> frontier;
+				frontier.push_back(origin);
+				temp_distances.at(0).at(convert(source)) = 0;
+				while (!frontier.empty()) {
+					auto& current = frontier.front();
+					auto is_current_wall = environment.is_cell_type(current.coord, Cell_Type::WALL);
+
+					// Check all directions
+					for (const auto& destination : environment.get_neighbours(current.coord)) {
+						if (!environment.is_inbound(destination)) {
+							continue;
+						}
+
+						auto is_next_wall = environment.is_cell_type(destination, Cell_Type::WALL);
+
+						// Check if path is valid
+						if (is_current_wall && is_next_wall) {
+							continue;
+						}
+
+						// Record
+						auto& recorded_dist = temp_distances.at(current.walls).at(convert(destination));
+						if (recorded_dist == EMPTY_VAL || current.dist + 1 < recorded_dist) {
+							recorded_dist = current.dist + 1;
+							size_t wall_count = current.walls + (is_next_wall ? 1 : 0);
+							if (wall_count <= max_walls) {
+								frontier.emplace_back(destination, current.dist + 1, wall_count);
+							}
+						}
+					}
+					frontier.pop_front();
+				}
+
+				// Recorded the smallest dist among the distances from different wall values
+				for (const auto& dist : temp_distances) {
+					for (const auto& destination : coordinates) {
+						auto& ref_dist = final_dist.at(source, destination);
+						if (ref_dist == EMPTY_VAL || dist.at(convert(destination)) < ref_dist) {
+							ref_dist = dist.at(convert(destination));
+						}
+					}
+				}
+
+			}
+		}
+
+		print_distances({ 5,1 }, 1);
+		print_distances({ 5,1 }, 2);
+		print_distances({ 5,0 }, 2);
+
+		size_t a;
+	}
+
+	std::vector<Distances> distances;
 
 	Environment environment; 
 	Ingredient ingredient1; 

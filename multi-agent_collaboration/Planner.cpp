@@ -264,6 +264,12 @@ void Planner::initialize_solutions() {
 	}
 }
 
+void Planner::initialize_heuristic() {
+	Heuristic heuristic(environment, Ingredient::CUTTING, Ingredient::LETTUCE, {}, {});
+	heuristic.init(2);
+
+}
+
 void Planner::recognize_goals() {
 	std::vector<std::vector<float>> data_raw(time_step);
 	std::vector<std::vector<float>> data_scaled;

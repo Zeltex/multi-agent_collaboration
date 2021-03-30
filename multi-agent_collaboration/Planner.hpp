@@ -173,6 +173,7 @@ public:
 		: agent(agent), environment(environment), time_step(0) {
 		initialize_reachables(initial_state);
 		initialize_solutions();
+		initialize_heuristic();
 	};
 	Action get_next_action(const State& state);
 
@@ -184,6 +185,7 @@ private:
 	bool ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const;
 	void initialize_reachables(const State& initial_state);
 	void initialize_solutions();
+	void initialize_heuristic();
 
 	void update_recipe_solutions(const std::set<Action_Path>& paths);
 	void recognize_goals();
