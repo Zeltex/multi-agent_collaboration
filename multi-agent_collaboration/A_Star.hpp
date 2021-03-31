@@ -272,69 +272,8 @@ struct Heuristic {
 			}
 		}
 		return min_dist;
-		//std::vector<Coordinate> locations1;
-		//std::vector<Coordinate> locations2;
-		//if (environment.is_type_stationary(ingredient1)) {
-		//	locations1 = environment.get_locations(state, ingredient1);
-		//	locations2 = environment.get_locations(state, ingredient2);
-		//	locations2 = handle_walls(locations1, locations2);
-		//} else {
-		//	locations1 = environment.get_non_wall_locations(state, ingredient1);
-		//	locations2 = environment.get_non_wall_locations(state, ingredient2);
-		//}
-		////if (locations1.empty()) locations1 = environment.get_recipe_locations(state, ingredient1);
-		////if (locations2.empty()) locations2 = environment.get_recipe_locations(state, ingredient2);
-		//if (locations1.empty() or locations2.empty()) {
-		//	return INFINITE_HEURISTIC;
-		//}
-		//size_t min_dist = EMPTY_VAL;
-		//size_t agents_index = environment.get_number_of_agents() - 1;
-		//if (handoff_agent.has_value()) {
-		//	--agents_index;
-		//}
-		//auto& distances_coop_ref = distances.at(agents_index);
-		////auto& distances_single_ref = distances.at(0);
-		//for (const auto& agent_id : agents.get()) {
-		//	if (handoff_agent.has_value() && agent_id == handoff_agent.value()) {
-		//		continue;
-		//	}
-		//	const auto& agent = state.agents.at(agent_id.id);
-		//	for (const auto& location1 : locations1) {
-		//		for (const auto& location2 : locations2) {
-		//			auto& locations_distance = distances_coop_ref.const_at(location1, location2);
-		//			min_dist = std::min(min_dist, 
-		//				distances_coop_ref.const_at(agent.coordinate, location1) + locations_distance);
-		//			
-		//			min_dist = std::min(min_dist, 
-		//				distances_coop_ref.const_at(agent.coordinate, location2) + locations_distance);
-		//		}
-		//	}
-		//}
-
-		//size_t min_dist2 = EMPTY_VAL;
-		//for (const auto& agent_combination : agent_combinations) {
-		//	if (handoff_agent.has_value() && agent_combination.contains(handoff_agent.value())) {
-		//		continue;
-		//	}
-		//	std::vector<Coordinate> agent_locations;
-		//	for (const auto& agent : agent_combination.get()) {
-		//		agent_locations.push_back(state.agents.at(agent.id).coordinate);
-		//	}
-		//	auto& distances_ref = distances.at(agent_combination.size());
-		//	for (const auto& location1 : locations1) {
-		//		for (const auto& location2 : locations2) {
-		//			auto& locations_distance = distances_ref.const_at(location1, location2);
-		//			min_dist = std::min(min_dist,
-		//				distances_coop_ref.const_at(agent.coordinate, location1) + locations_distance);
-
-		//			min_dist = std::min(min_dist,
-		//				distances_coop_ref.const_at(agent.coordinate, location2) + locations_distance);
-		//		}
-		//	}
-		//}
-
-		//return min_dist == EMPTY_VAL ? INFINITE_HEURISTIC : min_dist;
 	}
+
 	struct Search_Entry {
 		Search_Entry(Coordinate coord, size_t dist, size_t walls) : coord(coord), dist(dist), walls(walls) {}
 		Coordinate coord;
@@ -433,10 +372,10 @@ struct Heuristic {
 			}
 		}
 
-		print_distances({ 5,1 }, 1);
-		print_distances({ 5,1 }, 2);
-		print_distances({ 0,1 }, 2);
-		print_distances({ 5,0 }, 2);
+		//print_distances({ 5,1 }, 1);
+		//print_distances({ 5,1 }, 2);
+		//print_distances({ 0,1 }, 2);
+		//print_distances({ 5,0 }, 2);
 	}
 
 	std::vector<Distances> distances;

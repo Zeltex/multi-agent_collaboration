@@ -68,10 +68,10 @@ Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::v
 	}
 
 	for (const auto& agent_solution : agent_solutions) {
-		std::cout << agent_solution.first.result_char() << " : " 
-			<< agent_solution.second.incl_length << "/"
-			<< agent_solution.second.excl_length << " : " 
-			<< agent_solution.second.get_usefulness() << std::endl;
+		PRINT(Print_Category::PLANNER, std::to_string(agent_solution.first.result_char()) + " : "
+			+ std::to_string(agent_solution.second.incl_length) + "/"
+			+ std::to_string(agent_solution.second.excl_length) + " : "
+			+ std::to_string(agent_solution.second.get_usefulness()) + '\n');
 	}
 
 	for (const auto& agent_solution : agent_solutions) {
@@ -99,7 +99,7 @@ Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::v
 	//		return joint_action.actions.at(agent.id);
 	//	}
 	//}
-	std::cout << "Agent " << agent.id << " did not find useful action " << std::endl;
+	PRINT(Print_Category::PLANNER, std::string("Agent ") + std::to_string(agent.id) + " did not find useful action \n");
 	return { Direction::NONE, { agent } };
 }
 
@@ -140,11 +140,11 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 				paths.insert({ Action_Path{trim_path, recipe, agents, agent} });
 			}
 
-			std::cout << "(";
+			std::string debug_string = "(";
 			for (const auto& agent : agents.get()) {
-				std::cout << agent.id << ",";
+				debug_string += std::to_string(agent.id) + ",";
 			}
-			std::cout << ") : " << trim_path.size() << " : " << static_cast<char>(recipe.result) <<  " : " << diff << std::endl;
+			PRINT(Print_Category::PLANNER, debug_string + ") : " + std::to_string(trim_path.size()) + " : " + static_cast<char>(recipe.result) +  " : " + std::to_string(diff) + '\n');
 
 			//if (agents.size() > 1) {
 			//	for (const auto& temp_agent : agents.get()) {
@@ -242,7 +242,7 @@ void Planner::recognize_goals() {
 	
 	// Calculate absolute value for each recipe/timestep
 	for (const auto& [recipe_Agents, history] : recipe_solutions) {
-		std::cout << static_cast<char>(recipe_Agents.recipe.result) << recipe_Agents.agents.to_string() << "\t";
+		PRINT(Print_Category::PLANNER, std::to_string(static_cast<char>(recipe_Agents.recipe.result)) + recipe_Agents.agents.to_string() + "\t");
 		for (float i = 0; i < time_step; ++i) {
 			if (history.get(time_step) == 0) {
 				data_raw.at(i).push_back(0);
@@ -256,7 +256,8 @@ void Planner::recognize_goals() {
 			}
 		}
 	}
-	std::cout << std::endl;
+	PRINT(Print_Category::PLANNER, "\n");
+
 
 	// Normalize per timestep
 	for (const auto& entry : data_raw) {
@@ -272,8 +273,8 @@ void Planner::recognize_goals() {
 	// Debug print
  	for (const auto& data_row : data_scaled) {
 		for (const auto& data_entry : data_row) {
-			std::cout << data_entry << '\t';
+			PRINT(Print_Category::PLANNER, std::to_string(data_entry) + '\t');
 		}
-		std::cout << std::endl;
+		PRINT(Print_Category::PLANNER, "\n");
 	}
 }

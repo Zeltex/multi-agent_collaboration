@@ -6,3 +6,9 @@ void print(Print_Level level, const std::string& msg) {
 		std::cout << msg << std::endl;
 	}
 }
+
+void print(Print_Category category, const std::string& msg) {
+	if (static_cast<size_t>(category) == 1 && PRINT_LEVEL == Print_Level::DEBUG) {
+		std::cout << msg << std::endl;
+	}
+}
