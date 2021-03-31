@@ -11,6 +11,8 @@
 #include <deque>
 #include <numeric>
 #include <algorithm>
+#include <sstream>
+#include <iomanip>
 
 
 
@@ -154,12 +156,14 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 			//		diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 
 			//		Action_Path a_path{ path, recipe, agents, agent };
-			//		std::cout << agents.to_string() << "/" 
+			//		std::stringstream buffer;
+			//		buffer << agents.to_string() << "/"
 			//			<< temp_agent.to_string() << " : " 
 			//			<< a_path.first_action_string() << "-" 
 			//			<< a_path.last_action_string() << " : " 
 			//			<< recipe.result_char() << " : " 
 			//			<< diff << std::endl;
+			//		PRINT(Print_Category::PLANNER, buffer.str());
 			//	}
 			//}
 		}
@@ -242,7 +246,7 @@ void Planner::recognize_goals() {
 	
 	// Calculate absolute value for each recipe/timestep
 	for (const auto& [recipe_Agents, history] : recipe_solutions) {
-		PRINT(Print_Category::PLANNER, std::to_string(static_cast<char>(recipe_Agents.recipe.result)) + recipe_Agents.agents.to_string() + "\t");
+		PRINT(Print_Category::PLANNER, static_cast<char>(recipe_Agents.recipe.result) + recipe_Agents.agents.to_string() + "\t");
 		for (float i = 0; i < time_step; ++i) {
 			if (history.get(time_step) == 0) {
 				data_raw.at(i).push_back(0);
@@ -271,10 +275,13 @@ void Planner::recognize_goals() {
 	}
 
 	// Debug print
+	std::stringstream buffer;
+	buffer << std::fixed << std::setprecision(3);
  	for (const auto& data_row : data_scaled) {
 		for (const auto& data_entry : data_row) {
-			PRINT(Print_Category::PLANNER, std::to_string(data_entry) + '\t');
+			buffer << data_entry << '\t';
 		}
-		PRINT(Print_Category::PLANNER, "\n");
+		buffer << "\n";
 	}
+	PRINT(Print_Category::PLANNER, buffer.str());
 }

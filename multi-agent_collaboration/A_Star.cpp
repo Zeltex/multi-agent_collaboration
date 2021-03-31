@@ -24,7 +24,7 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 	auto source = original_state;
 	source.purge(agents);
 
-	initialize_variables(frontier, visited, nodes, source);
+	initialize_variables(frontier, visited, nodes, source, handoff_agent);
 
 	while (goal_node == nullptr) {
 
@@ -154,7 +154,7 @@ std::pair<bool, Node*> A_Star::check_and_perform(const Joint_Action& action, Nod
 	new_node->g += 1;
 	new_node->action_count += get_action_cost(action);
 	new_node->closed = false;
-	new_node->h = heuristic(new_node->state);
+	new_node->h = heuristic(new_node->state, handoff_agent);
 
 	new_node->calculate_hash();
 	return { true, new_node };
@@ -168,7 +168,7 @@ size_t A_Star::get_action_cost(const Joint_Action& joint_action) const {
 	return result;
 }
 
-void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes, const State& original_state) const {
+void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes, const State& original_state, const std::optional<Agent_Id>& handoff_agent) const {
 
 	constexpr size_t id = 0;
 	constexpr size_t g = 0;
@@ -178,7 +178,7 @@ void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_
 	constexpr bool closed = false;
 	constexpr bool valid = true;
 	Joint_Action action;
-	size_t h = heuristic(original_state);
+	size_t h = heuristic(original_state, handoff_agent);
 
 	nodes.emplace_back(original_state, id, g, h, action_count, pass_time, parent, action, closed, valid);
 	auto node = &nodes.back();
