@@ -28,9 +28,9 @@ struct Node {
 	}
 
 	Node(State state, size_t id, size_t g, size_t h, size_t action_count,
-		size_t pass_time, Node* parent, Joint_Action action, bool closed)
+		size_t pass_time, Node* parent, Joint_Action action, bool closed, bool valid)
 		: state(state), id(id), g(g), h(h), action_count(action_count),
-		pass_time(pass_time), parent(parent), action(action), closed(closed){};
+		pass_time(pass_time), parent(parent), action(action), closed(closed), valid(valid) {};
 	//Node(size_t state_id, size_t g, size_t h, size_t action_count) : 
 	//	state_id(state_id), g(g), h(h), action_count(action_count){};
 		
@@ -43,6 +43,7 @@ struct Node {
 		this->parent = other->parent;
 		this->action = other->action;
 		this->closed = other->closed;
+		this->valid = other->valid;
 		this->pass_time = other->pass_time;
 		this->hash = EMPTY_VAL;
 	}
@@ -59,17 +60,17 @@ struct Node {
 	//	this->action = action;
 	//	this->closed = closed;
 	//}
-
+	size_t g;
+	float h;
+	float f() const { return g + h; }
 	State state;
 	size_t id;
-	size_t g;
-	size_t h;
-	size_t f() const { return g + h; }
 	size_t action_count;
 	size_t pass_time;
 	const Node* parent;
 	Joint_Action action;
 	bool closed;
+	bool valid;
 
 	// For debug purposes
 	size_t hash;
@@ -95,7 +96,7 @@ struct Node {
 		return this->state < other->state;
 	}
 
-	// Used to determine if a shorter path has been found (assumes this->stae == other->state)
+	// Used to determine if a shorter path has been found (assumes this->state == other->state)
 	bool is_shorter(const Node* other) const {
 		if (this->g != other->g) {
 			return this->g < other->g;
@@ -111,18 +112,6 @@ struct Node {
 
 		return false;
 	}
-
-	// TODO - Check if more fields should be updated
-	// Used to update node when shorter path has been found
-	void update(const Node* other) {
-		if (this->id == other->parent->id) {
-			size_t dummy = 0;
-		}
-		this->g = other->g;
-		this->action_count = other->action_count;
-		this->parent = other->parent;
-		this->action = other->action;
-	}
 };
 
 namespace std {
@@ -136,66 +125,6 @@ namespace std {
 		}
 	};
 }
-
-struct State_Hash {
-	State_Hash(State state, size_t state_id, bool has_passed) 
-		: state(state), state_id(state_id), has_passed(has_passed) {};
-	State state;
-	bool has_passed;
-	size_t state_id;
-	bool operator==(const State_Hash& other) const {
-		if (has_passed != other.has_passed) return false;
-		return state == other.state;
-	}
-};
-
-namespace std {
-	template<>
-	struct hash<State_Hash>
-	{
-		size_t
-			operator()(const State_Hash& obj) const
-		{
-			return obj.state.to_hash();
-		}
-	};
-}
-
-struct State_Info {
-	State_Info() : state(), parent_id(EMPTY_VAL), action(), g(EMPTY_VAL),
-		action_count(EMPTY_VAL), has_agent_passed(true) {};
-
-	State_Info(State state, size_t parent_id, Joint_Action action, size_t g, 
-		size_t action_count, bool has_agent_passed) 
-		: state(state), parent_id(parent_id), action(action), g(g), 
-		action_count(action_count), has_agent_passed(has_agent_passed){};
-	
-	State state;
-	size_t parent_id;
-	Joint_Action action;
-	size_t g;
-	size_t action_count;
-	bool has_agent_passed;
-
-	bool operator<(const State_Info& other) const {
-		if (this->g != other.g) return this->g < other.g;
-		if (this->action_count != other.action_count) return this->action_count < other.action_count;
-		return false;
-	}
-
-	void update(size_t g, size_t action_count, size_t parent_id, const Joint_Action& action) {
-		this->g = g;
-		this->action_count = action_count;
-		this->parent_id = parent_id;
-		this->action = action;
-	}
-	void update(const State_Info& other) {
-		this->g = other.g;
-		this->action_count = other.action_count;
-		this->parent_id = other.parent_id;
-		this->action = other.action;
-	}
-};
 
 struct Distances {
 	Distances(size_t width, size_t height) 
@@ -221,54 +150,59 @@ struct Distances {
 // and using this in combination with the location1/location2 nested for loops
 #define INFINITE_HEURISTIC 1000
 struct Heuristic {
-	Heuristic(Environment environment, Ingredient ingredient1, Ingredient ingredient2,
-		const Agent_Combination& agents, const std::optional<Agent_Id>& handoff_agent)
-		: environment(environment), ingredient1(ingredient1), ingredient2(ingredient2),
-		agents(agents), handoff_agent(handoff_agent) {};
+	Heuristic(Environment environment) : environment(environment),
+		ingredient1(Ingredient::DELIVERY), ingredient2(Ingredient::DELIVERY), agents(), handoff_agent() {
+		init();
+	}
+
+	void set(Ingredient ingredient1, Ingredient ingredient2, const Agent_Combination& agents, 
+		const std::optional<Agent_Id>& handoff_agent) {
+		
+		this->ingredient1 = ingredient1;
+		this->ingredient2 = ingredient2;
+		this->agents = agents;
+		this->handoff_agent = handoff_agent;
+	}
 
 	size_t euclidean(Coordinate location1, Coordinate location2) const {
 		return (size_t)(std::abs((int)location1.first - (int)location2.first)
 			+ std::abs((int)location1.second - (int)location2.second));
 	}
-	size_t operator()(const State& state) {
-		auto locations1 = environment.get_locations(state, ingredient1);
-		auto locations2 = environment.get_locations(state, ingredient2);
+	size_t operator()(const State& state) const {
+		auto locations1 = environment.get_non_wall_locations(state, ingredient1);
+		auto locations2 = environment.get_non_wall_locations(state, ingredient2);
 		//if (locations1.empty()) locations1 = environment.get_recipe_locations(state, ingredient1);
 		//if (locations2.empty()) locations2 = environment.get_recipe_locations(state, ingredient2);
 		if (locations1.empty() or locations2.empty()) {
 			return INFINITE_HEURISTIC;
 		}
-		size_t min_dist = (size_t)-1;
-		for (const auto& location1 : locations1) {
-			for (const auto& location2 : locations2) {
-				min_dist = std::min(min_dist, euclidean(location1, location2));
-			}
+		size_t min_dist = EMPTY_VAL;
+		size_t agents_index = environment.get_number_of_agents() - 1;
+		if (handoff_agent.has_value()) {
+			--agents_index;
 		}
-		size_t min_agent_dist = (size_t)-1;
+		auto& distances_coop_ref = distances.at(agents_index);
+		//auto& distances_single_ref = distances.at(0);
 		for (const auto& agent_id : agents.get()) {
 			if (handoff_agent.has_value() && agent_id == handoff_agent.value()) {
 				continue;
 			}
 			const auto& agent = state.agents.at(agent_id.id);
-			if (!environment.is_type_stationary(ingredient1)) {
-				for (const auto& location1 : locations1) {
-					min_agent_dist = std::min(min_agent_dist, euclidean(location1, agent.coordinate));
-
-				}
-			}
-			if (!environment.is_type_stationary(ingredient2)) {
+			for (const auto& location1 : locations1) {
 				for (const auto& location2 : locations2) {
-					min_agent_dist = std::min(min_agent_dist, euclidean(location2, agent.coordinate));
-
+					auto& locations_distance = distances_coop_ref.const_at(location1, location2);
+					min_dist = std::min(min_dist, 
+						distances_coop_ref.const_at(agent.coordinate, location1) + locations_distance);
+					
+					min_dist = std::min(min_dist, 
+						distances_coop_ref.const_at(agent.coordinate, location2) + locations_distance);
 				}
 			}
 		}
-		if (min_dist == (size_t)-1) min_dist = 0;
-		if (min_agent_dist == (size_t)-1) min_agent_dist = 0;
-		else if (min_agent_dist > 0) --min_agent_dist;
-
-
-		return min_dist + min_agent_dist;
+		// NOTE: Must divide by 3 in case 
+		// 1) non-handoff agent is moving is moving towards goal with item, 
+		//		and handoff agent is moving from goal to non-handoff agent
+		return min_dist == EMPTY_VAL ? INFINITE_HEURISTIC : min_dist;
 	}
 	struct Search_Entry {
 		Search_Entry(Coordinate coord, size_t dist, size_t walls) : coord(coord), dist(dist), walls(walls) {}
@@ -292,7 +226,7 @@ struct Heuristic {
 	}
 
 	// All pairs shortest path for all amounts of agents, taking wall-handover in to account
-	void init(size_t amount_of_agents) {
+	void init() {
 		// Get all possible coordinates
 		std::vector<Coordinate> coordinates;
 		for (size_t x = 0; x < environment.get_width(); ++x) {
@@ -302,7 +236,7 @@ struct Heuristic {
 		}
 
 		// Loop agent sizes
-		for (size_t current_agents = 0; current_agents < amount_of_agents; ++current_agents) {
+		for (size_t current_agents = 0; current_agents < environment.get_number_of_agents(); ++current_agents) {
 			size_t max_walls = current_agents;
 			distances.emplace_back(environment.get_width(), environment.get_height());
 			auto& final_dist = distances.back();
@@ -310,7 +244,7 @@ struct Heuristic {
 			// Loop all source coordiantes
 			for (const auto& source : coordinates) {
 				std::vector<std::vector<size_t>> temp_distances(
-					amount_of_agents, std::vector<size_t>(environment.get_width() * environment.get_height(), EMPTY_VAL));
+					environment.get_number_of_agents(), std::vector<size_t>(environment.get_width() * environment.get_height(), EMPTY_VAL));
 
 				Search_Entry origin{ source, 0, 0 };
 				std::deque<Search_Entry> frontier;
@@ -359,16 +293,14 @@ struct Heuristic {
 			}
 		}
 
-		print_distances({ 5,1 }, 1);
-		print_distances({ 5,1 }, 2);
-		print_distances({ 5,0 }, 2);
-
-		size_t a;
+		//print_distances({ 5,1 }, 1);
+		//print_distances({ 5,1 }, 2);
+		//print_distances({ 5,0 }, 2);
 	}
 
 	std::vector<Distances> distances;
+	Environment environment;
 
-	Environment environment; 
 	Ingredient ingredient1; 
 	Ingredient ingredient2;
 	Agent_Combination agents;
@@ -379,7 +311,7 @@ struct Heuristic {
 struct Node_Queue_Comparator {
 	bool operator()(const Node* lhs, const Node* rhs) const {
 		if (lhs->f() != rhs->f()) return lhs->f() > rhs->f();
-		if (lhs->g != rhs->g) return lhs->g > rhs->g;
+		if (lhs->g != rhs->g) return lhs->g < rhs->g;
 		if (lhs->action_count != rhs->action_count) return lhs->action_count > rhs->action_count;
 		return false;
 	}
@@ -405,16 +337,16 @@ using Pool = boost::pool<>;
 
 class A_Star : public Search_Method {
 public:
-	using Search_Method::Search_Method;
+	A_Star(const Environment& environment, size_t depth_limit);
 	std::vector<Joint_Action> search_joint(const State& state, Recipe recipe, 
-		const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) const override;
+		const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) override;
 private:
 	size_t	get_action_cost(const Joint_Action& action) const;
 	
 	Node*	get_next_node(Node_Queue& frontier) const;
 	
 	void	initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes,
-		Heuristic& heuristic, const State& original_state, Pool& pool) const;
+		const State& original_state, Pool& pool) const;
 	
 	bool	is_being_passed(const std::optional<Agent_Id>& handoff_agent, const Joint_Action& action, 
 		const Node* current_node) const;
@@ -431,10 +363,11 @@ private:
 		bool has_handoff_agent) const;
 		
 	std::pair<bool, Node*> check_and_perform(const Joint_Action& action, Node_Ref& nodes,
-		const Node* current_node, const std::optional<Agent_Id>& handoff_agent,
-		Heuristic& heuristic, Pool& pool) const;
+		const Node* current_node, const std::optional<Agent_Id>& handoff_agent, Pool& pool) const;
 	
 	std::vector<Joint_Action> extract_actions(const Node* node) const;
+
+	Heuristic heuristic;
 
 	//std::vector<Joint_Action> extract_actions(size_t goal_id, const std::vector<State_Info>& states) const;
 };

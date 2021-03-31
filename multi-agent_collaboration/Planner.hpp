@@ -2,6 +2,9 @@
 
 #include "Environment.hpp"
 #include "Core.hpp"
+#include "Search.hpp"
+#include "State.hpp"
+
 #include <vector>
 #include <set>
 #include <algorithm> 
@@ -169,28 +172,22 @@ class Planner {
 
 
 public:
-	Planner(Environment environment, Agent_Id agent, const State& initial_state) 
-		: agent(agent), environment(environment), time_step(0) {
-		initialize_reachables(initial_state);
-		initialize_solutions();
-		initialize_heuristic();
-	};
+	Planner(Environment environment, Agent_Id agent, const State& initial_state);
 	Action get_next_action(const State& state);
 
 private:
 	std::vector<Agent_Combination> get_combinations(size_t n) const;
-	std::set<Action_Path> get_all_paths(const std::vector<Recipe>& recipes, const State& state) const;
+	std::set<Action_Path> get_all_paths(const std::vector<Recipe>& recipes, const State& state);
 	Action get_best_action(const std::set<Action_Path>& paths, const std::vector<Recipe>& recipes) const;
 	bool agent_in_best_solution(const std::map<Recipe, Recipe_Solution>& best_solutions, const Action_Path& action_path) const;
 	bool ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const;
 	void initialize_reachables(const State& initial_state);
 	void initialize_solutions();
-	void initialize_heuristic();
 
 	void update_recipe_solutions(const std::set<Action_Path>& paths);
 	void recognize_goals();
 
-
+	Search search;
 	Agent_Id agent;
 	Environment environment;
 	std::map<Agent_Combination, Reachables> agent_reachables;

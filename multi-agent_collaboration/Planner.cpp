@@ -14,6 +14,14 @@
 
 
 constexpr auto INITIAL_DEPTH_LIMIT = 18;
+
+Planner::Planner(Environment environment, Agent_Id agent, const State& initial_state)
+	: agent(agent), environment(environment), time_step(0), search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT)) {
+
+	initialize_reachables(initial_state);
+	initialize_solutions();
+}
+
 Action Planner::get_next_action(const State& state) {
 	auto recipes = environment.get_possible_recipes(state);
 	if (recipes.empty()) {
@@ -99,7 +107,7 @@ bool Planner::agent_in_best_solution(const std::map<Recipe, Recipe_Solution>& be
 	return best_agents.contains(agent);
 }
 
-std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& state) const {
+std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& state) {
 	std::set<Action_Path> paths;
 	auto agent_combinations = get_combinations(environment.get_number_of_agents());
 
@@ -113,7 +121,6 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 				continue;
 			}
 
-			Search search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT));
 
 			auto time_start = std::chrono::system_clock::now();
 			auto path = search.search_joint(state, recipe, agents, {});
@@ -138,22 +145,22 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 			}
 			std::cout << ") : " << trim_path.size() << " : " << static_cast<char>(recipe.result) <<  " : " << diff << std::endl;
 
-			if (agents.size() > 1) {
-				for (const auto& temp_agent : agents.get()) {
-					time_start = std::chrono::system_clock::now();
-					path = search.search_joint(state, recipe, agents, temp_agent);
-					time_end = std::chrono::system_clock::now();
-					diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
+			//if (agents.size() > 1) {
+			//	for (const auto& temp_agent : agents.get()) {
+			//		time_start = std::chrono::system_clock::now();
+			//		path = search.search_joint(state, recipe, agents, temp_agent);
+			//		time_end = std::chrono::system_clock::now();
+			//		diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 
-					Action_Path a_path{ path, recipe, agents, agent };
-					std::cout << agents.to_string() << "/" 
-						<< temp_agent.to_string() << " : " 
-						<< a_path.first_action_string() << "-" 
-						<< a_path.last_action_string() << " : " 
-						<< recipe.result_char() << " : " 
-						<< diff << std::endl;
-				}
-			}
+			//		Action_Path a_path{ path, recipe, agents, agent };
+			//		std::cout << agents.to_string() << "/" 
+			//			<< temp_agent.to_string() << " : " 
+			//			<< a_path.first_action_string() << "-" 
+			//			<< a_path.last_action_string() << " : " 
+			//			<< recipe.result_char() << " : " 
+			//			<< diff << std::endl;
+			//	}
+			//}
 		}
 	}
 	return paths;
@@ -262,12 +269,6 @@ void Planner::initialize_solutions() {
 			recipe_solutions.insert({ {recipe, agents}, {} });
 		}
 	}
-}
-
-void Planner::initialize_heuristic() {
-	Heuristic heuristic(environment, Ingredient::CUTTING, Ingredient::LETTUCE, {}, {});
-	heuristic.init(2);
-
 }
 
 void Planner::recognize_goals() {

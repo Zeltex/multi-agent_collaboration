@@ -10,6 +10,6 @@ public:
 	using Search_Method::Search_Method;
 	std::vector<Joint_Action> search_joint(const State& state, 
 		Recipe recipe, const Agent_Combination& agents, 
-		std::optional<Agent_Id> handoff_agent) const override;
+		std::optional<Agent_Id> handoff_agent) override;
 private:
 };

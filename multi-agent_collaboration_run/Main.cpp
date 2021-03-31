@@ -77,10 +77,10 @@ void solve(Environment& environment) {
 int main(int argc, char* argv[]) {
 	auto environment = Environment(2);
 
-	auto state = environment.load("../levels/BD/partial-divider_salad.txt");
-	environment.print_state(state);
 
 	if (PLAY) {
+		auto state = environment.load("../levels/BD/partial-divider_salad.txt");
+		environment.print_state(state);
 		environment.play(state);
 	} else {
 		solve(environment);

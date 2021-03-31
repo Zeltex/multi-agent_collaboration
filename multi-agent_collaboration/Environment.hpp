@@ -219,162 +219,7 @@ private:
 };
 
 
-struct State {
-	std::map<Coordinate, Ingredient> items;
-	std::vector<std::pair<Coordinate, Ingredient>> goal_items;
-	std::vector<Agent> agents;
-
-	bool operator<(const State& other) const {
-		std::cout << "<state" << std::endl;
-		if (this->items.size() != other.items.size()) return this->items.size() < other.items.size();
-		if (this->goal_items.size() != other.goal_items.size()) return this->goal_items.size() < other.goal_items.size();
-		if (this->agents.size() != other.agents.size()) return this->agents.size() < other.agents.size();
-
-		if (this->items < other.items) return true;
-		if (this->items > other.items) return false;
-		if (this->goal_items < other.goal_items) return true;
-		if (this->goal_items > other.goal_items) return false;
-		if (this->agents < other.agents) return true;
-		//if (this->agents > other.agents) return false;
-		return false;
-	}
-
-	std::optional<Ingredient> get_ingredient_at_position(Coordinate coordinate) const {
-		auto it = items.find(coordinate);
-		if (it != items.end()) {
-			return it->second;
-		} else {
-			return {};
-		}
-	}
-
-	bool items_hoarded(const Recipe& recipe, const Agent_Combination& available_agents) const {
-		std::vector<Ingredient> items_needed{ recipe.ingredient1, recipe.ingredient2 };
-		for (const auto& item : items) {
-			auto it = std::find(items_needed.begin(), items_needed.end(), item.second);
-			if (it != items_needed.end()) {
-				items_needed.erase(it);
-				if (items_needed.empty()) false;
-			}
-		}
-
-		for (size_t i = 0; i < agents.size(); ++i) {
-			if (agents.at(i).item.has_value()) {
-				if (std::find(items_needed.begin(), items_needed.end(), agents.at(i).item.value()) != items_needed.end()
-					&& !available_agents.contains({ i })) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
-	Coordinate get_location(Agent_Id agent) const {
-		return agents.at(agent.id).coordinate;
-	}
-
-	bool contains_item(Ingredient ingredient) const {
-		for (const auto& item : items) {
-			if (item.second == ingredient) return true;
-		}
-		for (const auto& item : goal_items) {
-			if (item.second == ingredient) return true;
-		}
-		for (const auto& agent : agents) {
-			if (agent.item == ingredient) return true;
-		}
-		return false;
-	}
-
-	void add(Coordinate coordinate, Ingredient ingredient) {
-		items.insert({ coordinate, ingredient });
-	}
-
-	void add_goal_item(Coordinate coordinate, Ingredient ingredient) {
-		goal_items.push_back({ coordinate, ingredient });
-	}
-
-	void remove(Coordinate coordinate) {
-		items.erase(items.find(coordinate));
-	}
-
-	std::string to_hash_string() const {
-		std::string hash;
-		hash += std::to_string(items.size() * 128 + agents.size());
-		for (const auto& item : items) {
-			hash += std::to_string(item.first.first * 128 + item.first.second)
-				+ static_cast<char>(item.second);
-		}
-
-		for (const auto& agent : agents) {
-			hash += std::to_string(agent.coordinate.first * 128 + agent.coordinate.second);
-			if (agent.item.has_value()) {
-				hash += static_cast<char>(agent.item.value());
-			}
-			hash += "0";
-		}
-		return hash;
-	}
-
-	size_t to_hash() const {
-		return std::hash<std::string>()(this->to_hash_string());
-	}
-
-	bool operator==(const State& other) const {
-		if (items.size() != other.items.size()) return false;
-		if (agents.size() != other.agents.size()) return false;
-		for (size_t i = 0; i < agents.size(); ++i) {
-			if (agents.at(i) != other.agents.at(i)) return false;
-		}
-		for (const auto& item : items) {
-			auto it = other.items.find(item.first);
-			if (it == other.items.end()) return false;
-			if (item.second != it->second) return false;
-		}
-		return true;
-	}
-
-	std::vector<Coordinate> get_locations(Ingredient ingredient) const {
-		std::vector<Coordinate> result;
-		for (const auto& item : items) {
-			if (item.second == ingredient) {
-				result.push_back(item.first);
-			}
-		}
-		for (const auto& agent : agents) {
-			if (agent.item == ingredient) {
-				result.push_back(agent.coordinate);
-			}
-		}
-		return result;
-	}
-
-	void print_compact() const {
-		for (const auto& item : items) {
-			std::cout << "(" << static_cast<char>(item.second) << ", " << item.first.first << ", " << item.first.second << ") ";
-		}
-		size_t agent_counter = 0;
-		for (const auto& agent : agents) {
-			agent.print_compact({ agent_counter });
-			++agent_counter;
-		}
-	}
-
-
-};
-
-namespace std {
-	template<>
-	struct hash<State>
-	{
-		size_t
-			operator()(const State& obj) const
-		{
-			return obj.to_hash();
-		}
-	};
-}
-
+struct State;
 class Environment {
 
 public:
@@ -386,27 +231,29 @@ public:
 	bool is_inbound(const Coordinate& coordiante) const;
 	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
 	bool is_type_stationary(Ingredient ingredient) const;
+	bool is_done(const State& state) const;
 	bool act(State& state, const Action& action) const;
 	bool act(State& state, const Action& action, Print_Level print_level) const;
 	bool act(State& state, const Joint_Action& action) const;
 	bool act(State& state, const Joint_Action& action, Print_Level print_level) const;
-	std::vector<Action> get_actions(Agent_Id agent) const;
-	std::vector<Joint_Action> get_joint_actions(const Agent_Combination& agents) const;
 	State load(const std::string& path);
 	void print_state() const;
 	void print_state(const State& state) const;
 	void play(State& state) const;
-	std::vector<Recipe> get_possible_recipes(const State& state) const; 
-	const std::vector<Recipe>& get_all_recipes() const;
-	std::vector<Ingredient> get_goal() const;
-	bool is_done(const State& state) const;
-	size_t get_number_of_agents() const;
 	Joint_Action convert_to_joint_action(const Action& action, Agent_Id agent) const;
-	std::vector<Coordinate> get_locations(const State& state, Ingredient ingredient) const;
-	std::vector<Coordinate> get_recipe_locations(const State& state, Ingredient ingredient) const;
-	size_t get_width() const;
-	size_t get_height() const;
-	std::vector<Coordinate> get_neighbours(Coordinate location) const;
+
+	std::vector<Action>			get_actions(Agent_Id agent) const;
+	const std::vector<Recipe>&	get_all_recipes() const;
+	std::vector<Ingredient>		get_goal() const;
+	size_t						get_height() const;
+	std::vector<Joint_Action>	get_joint_actions(const Agent_Combination& agents) const;
+	std::vector<Coordinate>		get_locations(const State& state, Ingredient ingredient) const;
+	std::vector<Coordinate>		get_neighbours(Coordinate location) const;
+	std::vector<Coordinate>		get_non_wall_locations(const State& state, Ingredient ingredient) const;
+	size_t						get_number_of_agents() const;
+	std::vector<Recipe>			get_possible_recipes(const State& state) const; 
+	std::vector<Coordinate>		get_recipe_locations(const State& state, Ingredient ingredient) const;
+	size_t						get_width() const;
 	
 
 private:

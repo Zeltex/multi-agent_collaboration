@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include "Environment.hpp"
+#include "State.hpp"
 
 
 class Search_Trimmer {

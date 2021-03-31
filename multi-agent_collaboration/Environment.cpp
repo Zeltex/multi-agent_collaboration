@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <set>
 
+#include "State.hpp"
 
 bool Environment::is_inbound(const Coordinate& coordinate) const {
 	return coordinate.first >= 0
@@ -525,6 +526,16 @@ Joint_Action Environment::convert_to_joint_action(const Action& action, Agent_Id
 		}
 	}
 	return { actions };
+}
+
+std::vector<Coordinate> Environment::get_non_wall_locations(const State& state, 
+	Ingredient ingredient) const {
+	
+	switch (ingredient) {
+	case Ingredient::CUTTING: return cutting_stations;
+	case Ingredient::DELIVERY: return delivery_stations;
+	default: return state.get_non_wall_locations(ingredient, *this);
+	}
 }
 
 std::vector<Coordinate> Environment::get_locations(const State& state, Ingredient ingredient) const {

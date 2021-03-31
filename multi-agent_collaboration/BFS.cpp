@@ -7,7 +7,7 @@
 #include <stdexcept>
 
 std::vector<Joint_Action> BFS::search_joint(const State& state,
-	Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) const {
+	Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) {
 
 	if (handoff_agent.has_value()) {
 		throw std::runtime_error("Handoff agent not supported for bfs");
