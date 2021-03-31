@@ -3,6 +3,7 @@
 #include "A_Star.hpp"
 #include "Search.hpp"
 #include "Search_Trimmer.hpp"
+#include "Utils.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -42,7 +43,7 @@ Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::v
 	// Init best solutions
 	std::map<Recipe, Recipe_Solution> best_solutions;
  	for (const auto& recipe : recipes) {
-		Recipe_Solution solution { Agent_Combination{}, (size_t)-1 };
+		Recipe_Solution solution { Agent_Combination{}, EMPTY_VAL };
 		best_solutions.insert({ recipe, solution });
 		agent_solutions.insert({ recipe, Agent_Usefulnes{} });
 	}
@@ -191,42 +192,6 @@ bool Planner::ingredients_reachable(const Recipe& recipe, const Agent_Combinatio
 		}
 	}
 	return true;
-}
-
-// Get all combinations of numbers/agents <n
-std::vector<Agent_Combination> Planner::get_combinations(size_t n) const {
-	if (n == 0) return {};
-	std::vector<bool> status;
-	status.push_back(true);
-	for (size_t i = 1; i < n; ++i) {
-		status.push_back(false);
-	}
-	std::vector<Agent_Combination> combinations;
-
-	bool done = false;
-	while (!done) {
-		std::vector<Agent_Id> next_combination;
-		for (size_t i = 0; i < n; ++i) {
-			if (status.at(i)) next_combination.push_back(i);
-		}
-
-		size_t counter = 0;
-		while (true) {
-			status.at(counter) = !status.at(counter);
-			if (status.at(counter)) {
-				break;
-			} else {
-				++counter;
-				if (counter == status.size()) {
-					done = true;
-					break;
-				}
-			}
-		}
-
-		combinations.push_back(next_combination);
-	}
-	return combinations;
 }
 
 

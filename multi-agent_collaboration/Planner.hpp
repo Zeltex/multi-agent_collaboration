@@ -89,8 +89,8 @@ struct Recipe_Solution {
 
 struct Agent_Usefulnes {
 	Agent_Usefulnes() : 
-		incl_length((size_t)-1), incl_first_action(EMPTY_VAL), incl_last_action(EMPTY_VAL),
-		excl_length((size_t)-1), excl_first_action(EMPTY_VAL), excl_last_action(EMPTY_VAL),
+		incl_length(EMPTY_VAL), incl_first_action(EMPTY_VAL), incl_last_action(EMPTY_VAL),
+		excl_length(EMPTY_VAL), excl_first_action(EMPTY_VAL), excl_last_action(EMPTY_VAL),
 		action(Direction::NONE, {EMPTY_VAL}) {}
 
 	size_t incl_length;
@@ -176,7 +176,6 @@ public:
 	Action get_next_action(const State& state);
 
 private:
-	std::vector<Agent_Combination> get_combinations(size_t n) const;
 	std::set<Action_Path> get_all_paths(const std::vector<Recipe>& recipes, const State& state);
 	Action get_best_action(const std::set<Action_Path>& paths, const std::vector<Recipe>& recipes) const;
 	bool agent_in_best_solution(const std::map<Recipe, Recipe_Solution>& best_solutions, const Action_Path& action_path) const;

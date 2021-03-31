@@ -157,6 +157,14 @@ std::vector<Coordinate> State::get_non_wall_locations(Ingredient ingredient, con
 	return result;
 }
 
+void State::purge(const Agent_Combination& agents_keep) {
+	for (size_t i = 0; i < agents.size(); ++i) {
+		if (!agents_keep.contains({ i })) {
+			agents.at(i).coordinate = { EMPTY_VAL, EMPTY_VAL };
+		}
+	}
+}
+
 void State::print_compact() const {
 	for (const auto& item : items) {
 		std::cout << "(" << static_cast<char>(item.second) << ", " << item.first.first << ", " << item.first.second << ") ";

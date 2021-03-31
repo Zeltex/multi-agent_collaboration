@@ -15,16 +15,16 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 	heuristic.set(recipe.ingredient1, recipe.ingredient2, agents, handoff_agent);
 	std::cout << "\n\nStarting search " << recipe.result_char() << " " << agents.to_string() << (handoff_agent.has_value() ? "/" + std::to_string(handoff_agent.value().id) : "") << "\n" << std::endl;
 
-	Pool pool(sizeof(Node));
-
 	Node_Queue frontier;
 	Node_Set visited;
 	Node_Ref nodes;
 
 	Node* goal_node = nullptr;
 	auto actions = get_actions(agents, handoff_agent.has_value());
+	auto source = original_state;
+	source.purge(agents);
 
-	initialize_variables(frontier, visited, nodes, original_state, pool);
+	initialize_variables(frontier, visited, nodes, source);
 
 	while (goal_node == nullptr) {
 
@@ -44,34 +44,20 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 		for (const auto& action : actions) {
 
 			// Perform action if valid
-			auto [action_valid, new_node] = check_and_perform(action, nodes, current_node, handoff_agent, pool);
+			auto [action_valid, new_node] = check_and_perform(action, nodes, current_node, handoff_agent);
 			if (!action_valid) {
 				continue;
 			}
 
 			auto visited_it = visited.find(new_node);
 
+			// Existing state
 			if (visited_it != visited.end()) {
 				if (new_node->is_shorter(*visited_it)) {
-					// Faster path found to already expanded node
-					//if ((*visited_it)->closed && new_node->g != (*visited_it)->g) {
-					//	std::cout << "Printing new_node/new_node_parent/it/it_parent" << std::endl;
-					//	print_current(new_node);
-					//	print_current(new_node->parent);
-					//	print_current(*visited_it);
-					//	print_current((*visited_it)->parent);
-					//	throw std::runtime_error("Heuristic is not consistent");
-
-					//// Path with fewer individual actions
-					//} else {
-					//	if (new_node->g < (*visited_it)->g) {
-					//		auto dummy = 0;
-					//	}
 						(*visited_it)->valid = false;
 						visited.erase(visited_it);
 						visited.insert(new_node);
 						frontier.push(new_node);
-					//}
 				} else {
 					nodes.pop_back();
 				}
@@ -109,7 +95,9 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 std::vector<Joint_Action> A_Star::extract_actions(const Node* node) const {
 	std::vector<Joint_Action> result;
 	while (node->parent != nullptr) {
-		result.push_back(node->action);
+		if (node->action.is_action_valid()) {
+			result.push_back(node->action);
+		}
 		node = node->parent;
 	}
 	std::vector<Joint_Action> reversed;
@@ -138,7 +126,7 @@ void A_Star::print_current(const Node* node) const {
 	std::cout << std::endl;
 }
 
-std::pair<bool, Node*> A_Star::check_and_perform(const Joint_Action& action, Node_Ref& nodes, const Node* current_node, const std::optional<Agent_Id>& handoff_agent, Pool& pool) const {
+std::pair<bool, Node*> A_Star::check_and_perform(const Joint_Action& action, Node_Ref& nodes, const Node* current_node, const std::optional<Agent_Id>& handoff_agent) const {
 	
 	// Useful action from handoff agent after handoff
 	if (current_node->has_agent_passed() && handoff_agent.has_value() && action.is_action_useful(handoff_agent.value())) {
@@ -168,10 +156,6 @@ std::pair<bool, Node*> A_Star::check_and_perform(const Joint_Action& action, Nod
 	new_node->closed = false;
 	new_node->h = heuristic(new_node->state);
 
-	// TODO - Probably don't need this on account of the second if statement in this method
-	if (!new_node->has_agent_passed() && is_being_passed(handoff_agent, action, current_node)) {
-		new_node->pass_time = new_node->g;
-	}
 	new_node->calculate_hash();
 	return { true, new_node };
 }
@@ -184,11 +168,7 @@ size_t A_Star::get_action_cost(const Joint_Action& joint_action) const {
 	return result;
 }
 
-bool A_Star::is_being_passed(const std::optional<Agent_Id>& handoff_agent, const Joint_Action& action, const Node* current_node) const {
-	return handoff_agent.has_value() && !action.is_action_useful(handoff_agent.value());
-}
-
-void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes, const State& original_state, Pool& pool) const {
+void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes, const State& original_state) const {
 
 	constexpr size_t id = 0;
 	constexpr size_t g = 0;

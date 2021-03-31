@@ -22,6 +22,7 @@ struct State {
 	std::vector<Coordinate> get_non_wall_locations(Ingredient ingredient,
 		const Environment& environment) const;
 	void print_compact() const;
+	void purge(const Agent_Combination& agents);
 
 	std::map<Coordinate, Ingredient> items;
 	std::vector<std::pair<Coordinate, Ingredient>> goal_items;

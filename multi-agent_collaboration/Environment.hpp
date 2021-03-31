@@ -174,7 +174,7 @@ struct Agent {
 
 struct Agent_Combination {
 	Agent_Combination() : agents() { generate_pretty_print(); }
-	Agent_Combination(std::vector<Agent_Id> agents) : agents(agents) { generate_pretty_print(); }
+	explicit Agent_Combination(std::vector<Agent_Id> agents) : agents(agents) { generate_pretty_print(); }
 	std::vector<Agent_Id> agents;
 	std::string pretty_print;
 
