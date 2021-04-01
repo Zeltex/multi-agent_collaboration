@@ -33,9 +33,7 @@ struct Node {
 		size_t pass_time, Node* parent, Joint_Action action, bool closed, bool valid)
 		: state(state), id(id), g(g), h(h), action_count(action_count),
 		pass_time(pass_time), parent(parent), action(action), closed(closed), valid(valid) {};
-	//Node(size_t state_id, size_t g, size_t h, size_t action_count) : 
-	//	state_id(state_id), g(g), h(h), action_count(action_count){};
-		
+	
 	void init(const Node* other) {
 		this->state = other->state;
 		this->id = other->id;
@@ -50,18 +48,6 @@ struct Node {
 		this->hash = EMPTY_VAL;
 	}
 
-	//void init(State state, size_t id, size_t g, size_t h, size_t action_count,
-	//	size_t pass_time, Node* parent, Joint_Action action, bool closed) {
-	//	this->state = state;
-	//	this->id = id;
-	//	this->g = g; 
-	//	this->h = h;
-	//	this->action_count = action_count;
-	//	this->pass_time = pass_time;
-	//	this->parent = parent;
-	//	this->action = action;
-	//	this->closed = closed;
-	//}
 	size_t g;
 	float h;
 	float f() const { return g + h; }
@@ -135,6 +121,7 @@ struct Node_Queue_Comparator {
 		if (lhs->f() != rhs->f()) return lhs->f() > rhs->f();
 		if (lhs->g != rhs->g) return lhs->g < rhs->g;
 		if (lhs->action_count != rhs->action_count) return lhs->action_count > rhs->action_count;
+		if (lhs->pass_time != rhs->pass_time) return lhs->pass_time > rhs->pass_time;
 		return false;
 	}
 };

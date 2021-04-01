@@ -18,8 +18,9 @@ struct State {
 	std::string to_hash_string() const;
 	size_t to_hash() const;
 	bool operator==(const State& other) const;
-	std::vector<Coordinate> get_locations(Ingredient ingredient) const;
-	std::vector<Coordinate> get_non_wall_locations(Ingredient ingredient,
+	std::vector<Coordinate> get_coordinates(Ingredient ingredient) const;
+	std::vector<Location> get_locations(Ingredient ingredient) const;
+	std::vector<Location> get_non_wall_locations(Ingredient ingredient,
 		const Environment& environment) const;
 	void print_compact() const;
 	void purge(const Agent_Combination& agents);

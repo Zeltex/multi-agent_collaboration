@@ -16,7 +16,7 @@
 
 
 
-constexpr auto INITIAL_DEPTH_LIMIT = 18;
+constexpr auto INITIAL_DEPTH_LIMIT = 30;
 
 Planner::Planner(Environment environment, Agent_Id agent, const State& initial_state)
 	: agent(agent), environment(environment), time_step(0), search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT)) {
@@ -148,24 +148,24 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 			}
 			PRINT(Print_Category::PLANNER, debug_string + ") : " + std::to_string(trim_path.size()) + " : " + static_cast<char>(recipe.result) +  " : " + std::to_string(diff) + '\n');
 
-			//if (agents.size() > 1) {
-			//	for (const auto& temp_agent : agents.get()) {
-			//		time_start = std::chrono::system_clock::now();
-			//		path = search.search_joint(state, recipe, agents, temp_agent);
-			//		time_end = std::chrono::system_clock::now();
-			//		diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
+			if (agents.size() > 1) {
+				for (const auto& temp_agent : agents.get()) {
+					time_start = std::chrono::system_clock::now();
+					path = search.search_joint(state, recipe, agents, temp_agent);
+					time_end = std::chrono::system_clock::now();
+					diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 
-			//		Action_Path a_path{ path, recipe, agents, agent };
-			//		std::stringstream buffer;
-			//		buffer << agents.to_string() << "/"
-			//			<< temp_agent.to_string() << " : " 
-			//			<< a_path.first_action_string() << "-" 
-			//			<< a_path.last_action_string() << " : " 
-			//			<< recipe.result_char() << " : " 
-			//			<< diff << std::endl;
-			//		PRINT(Print_Category::PLANNER, buffer.str());
-			//	}
-			//}
+					Action_Path a_path{ path, recipe, agents, agent };
+					std::stringstream buffer;
+					buffer << agents.to_string() << "/"
+						<< temp_agent.to_string() << " : " 
+						<< a_path.first_action_string() << "-" 
+						<< a_path.last_action_string() << " : " 
+						<< recipe.result_char() << " : " 
+						<< diff << std::endl;
+					PRINT(Print_Category::PLANNER, buffer.str());
+				}
+			}
 		}
 	}
 	return paths;
@@ -184,13 +184,13 @@ bool Planner::ingredients_reachable(const Recipe& recipe, const Agent_Combinatio
 		exit(-1);
 	}
 
-	for (const auto& location : environment.get_locations(state, recipe.ingredient1)) {
+	for (const auto& location : environment.get_coordinates(state, recipe.ingredient1)) {
 		if (!reachables->second.get(location)) {
 			return false;
 		}
 	}
 
-	for (const auto& location : environment.get_locations(state, recipe.ingredient2)) {
+	for (const auto& location : environment.get_coordinates(state, recipe.ingredient2)) {
 		if (!reachables->second.get(location)) {
 			return false;
 		}

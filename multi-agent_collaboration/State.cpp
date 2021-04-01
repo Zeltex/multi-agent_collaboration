@@ -110,7 +110,8 @@ bool State::operator==(const State& other) const {
 	return true;
 }
 
-std::vector<Coordinate> State::get_locations(Ingredient ingredient) const {
+
+std::vector<Coordinate> State::get_coordinates(Ingredient ingredient) const {
 	std::vector<Coordinate> result;
 	for (const auto& item : items) {
 		if (item.second == ingredient) {
@@ -125,18 +126,33 @@ std::vector<Coordinate> State::get_locations(Ingredient ingredient) const {
 	return result;
 }
 
-std::vector<Coordinate> State::get_non_wall_locations(Ingredient ingredient, const Environment& environment) const {
-	std::vector<Coordinate> result;
+std::vector<Location> State::get_locations(Ingredient ingredient) const {
+	std::vector<Location> result;
+	for (const auto& item : items) {
+		if (item.second == ingredient) {
+			result.push_back({ item.first, item.first, false });
+		}
+	}
+	for (const auto& agent : agents) {
+		if (agent.item == ingredient) {
+			result.push_back({ agent.coordinate, agent.coordinate, false });
+		}
+	}
+	return result;
+}
+
+std::vector<Location> State::get_non_wall_locations(Ingredient ingredient, const Environment& environment) const {
+	std::vector<Location> result;
 	for (const auto& item : items) {
 		if (item.second == ingredient) {
 			if (environment.is_cell_type(item.first, Cell_Type::WALL)) {
 				for (const auto& coord : environment.get_neighbours(item.first)) {
 					if (environment.is_inbound(coord) && !environment.is_cell_type(coord, Cell_Type::WALL)) {
-						result.push_back(coord);
+						result.push_back({ coord, item.first, true });
 					}
 				}
 			} else {
-				result.push_back(item.first);
+				result.push_back({ item.first, item.first, false });
 			}
 		}
 	}
@@ -145,11 +161,11 @@ std::vector<Coordinate> State::get_non_wall_locations(Ingredient ingredient, con
 			if (environment.is_cell_type(agent.coordinate, Cell_Type::WALL)) {
 				for (const auto& coord : environment.get_neighbours(agent.coordinate)) {
 					if (environment.is_inbound(coord) && !environment.is_cell_type(coord, Cell_Type::WALL)) {
-						result.push_back(coord);
+						result.push_back({ coord, agent.coordinate, true });
 					}
 				}
 			} else {
-				result.push_back(agent.coordinate);
+				result.push_back({ agent.coordinate, agent.coordinate, false });
 			}
 
 		}

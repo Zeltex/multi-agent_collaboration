@@ -34,13 +34,18 @@ struct Distances {
 class Heuristic {
 public:
 	Heuristic(Environment environment);
-	size_t operator()(const State& state, const std::optional<Agent_Id> handoff_agent) const;
+	size_t operator()(const State& state, const std::optional<Agent_Id>& handoff_agent) const;
 	void set(Ingredient ingredient1, Ingredient ingredient2, const Agent_Combination& agents,
 		const std::optional<Agent_Id>& handoff_agent);
 
 private:
-	size_t get_agent_travel(Coordinate source, Coordinate destination, const State& state, const std::optional<Agent_Id> handoff_agent) const;
-	size_t min_agent_dist(const State& state, Coordinate location) const;
+	std::pair<size_t, size_t> get_helper_agents_distance(Coordinate source, Coordinate destination, const State& state, 
+		const std::optional<Agent_Id> handoff_agent, const Agent_Combination& local_agents) const;
+	
+	size_t get_heuristic_distance(const Location& location1, const Location& location2, const State& state, 
+		const std::optional<Agent_Id>& handoff_agent, const Agent_Combination& local_agents) const;
+	
+	size_t get_nearest_agent_distance(const State& state, Coordinate location, const std::optional<Agent_Id>& handoff_agent) const;
 	size_t convert(const Coordinate& coord1) const;
 	void print_distances(Coordinate coordinate, size_t agent_number) const;
 	void init();

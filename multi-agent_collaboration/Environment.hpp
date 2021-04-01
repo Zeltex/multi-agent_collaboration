@@ -11,6 +11,12 @@
 
 using Coordinate = std::pair<size_t, size_t> ;
 
+struct Location {
+	Coordinate coordinate;
+	Coordinate original;
+	bool from_wall; // If this was generated from neighbouring wall(original), used by heuristic
+};
+
 struct Agent_Id {
 	Agent_Id(size_t id) :id(id) {};
 	size_t id;
@@ -247,9 +253,10 @@ public:
 	std::vector<Ingredient>		get_goal() const;
 	size_t						get_height() const;
 	std::vector<Joint_Action>	get_joint_actions(const Agent_Combination& agents) const;
-	std::vector<Coordinate>		get_locations(const State& state, Ingredient ingredient) const;
+	std::vector<Coordinate>		get_coordinates(const State& state, Ingredient ingredient) const;
 	std::vector<Coordinate>		get_neighbours(Coordinate location) const;
-	std::vector<Coordinate>		get_non_wall_locations(const State& state, Ingredient ingredient) const;
+	std::vector<Location>		get_locations(const State& state, Ingredient ingredient) const;
+	std::vector<Location>		get_non_wall_locations(const State& state, Ingredient ingredient) const;
 	size_t						get_number_of_agents() const;
 	std::vector<Recipe>			get_possible_recipes(const State& state) const; 
 	std::vector<Coordinate>		get_recipe_locations(const State& state, Ingredient ingredient) const;

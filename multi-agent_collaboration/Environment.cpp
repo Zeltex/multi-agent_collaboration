@@ -527,22 +527,32 @@ Joint_Action Environment::convert_to_joint_action(const Action& action, Agent_Id
 	}
 	return { actions };
 }
-
-std::vector<Coordinate> Environment::get_non_wall_locations(const State& state, 
-	Ingredient ingredient) const {
-	
+std::vector<Location> Environment::get_locations(const State& state, Ingredient ingredient) const {
+	std::vector<Location> result;
 	switch (ingredient) {
-	case Ingredient::CUTTING: return cutting_stations;
-	case Ingredient::DELIVERY: return delivery_stations;
-	default: return state.get_non_wall_locations(ingredient, *this);
+	case Ingredient::CUTTING: {
+		for (auto& coord : cutting_stations) result.push_back({ coord, coord, false }); 
+		return result;
+	}
+	case Ingredient::DELIVERY: {
+		for (auto& coord : delivery_stations) result.push_back({ coord, coord, false });
+		return result;
+	}
+	default: return state.get_locations(ingredient);
 	}
 }
 
-std::vector<Coordinate> Environment::get_locations(const State& state, Ingredient ingredient) const {
+// Assumes ingredient is non-stationary
+std::vector<Location> Environment::get_non_wall_locations(const State& state, Ingredient ingredient) const {
+	return state.get_non_wall_locations(ingredient, *this);
+}
+
+
+std::vector<Coordinate> Environment::get_coordinates(const State& state, Ingredient ingredient) const {
 	switch (ingredient) {
 	case Ingredient::CUTTING: return cutting_stations;
 	case Ingredient::DELIVERY: return delivery_stations;
-	default: return state.get_locations(ingredient);
+	default: return state.get_coordinates(ingredient);
 	}
 }
 

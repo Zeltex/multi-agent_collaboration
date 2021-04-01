@@ -64,7 +64,6 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 
 			// New state
 			} else {
-				visited.insert(new_node);
 
 				// Goal state which does NOT satisfy handoff_agent
 				if (is_invalid_goal(new_node, recipe, action, handoff_agent)) {
@@ -73,9 +72,11 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 				// Goal state which DOES satisfy handoff_agent
 				} else if (is_valid_goal(new_node, recipe, action, handoff_agent)) {
 					goal_node = new_node;
+					break;
 
 				// Non-goal state
 				} else {
+					visited.insert(new_node);
 					frontier.push(new_node);
 				}
 			}
@@ -137,8 +138,10 @@ std::pair<bool, Node*> A_Star::check_and_perform(const Joint_Action& action, Nod
 
 	// Handoff action, simply change handoff status
 	if (!action.is_action_valid()) {
+		new_node->action = action;
 		new_node->g = current_node->g;
 		new_node->pass_time = current_node->g;
+		new_node->closed = false;
 		new_node->calculate_hash();
 		return { true, new_node };
 	}
