@@ -98,26 +98,31 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 	if (location1.original == location2.original) {
 		return get_nearest_agent_distance(state, location1.original, handoff_agent);
 	}
-	
+
 	size_t min_dist = EMPTY_VAL;
 	size_t wall_penalty = (size_t)0
-						+ (location1.from_wall ? 1 : 0) 
-						+ (location2.from_wall ? 1 : 0) 
-						+ (environment.is_type_stationary(ingredient1) 
-							&& location1.coordinate != location2.coordinate ? 1 : 0);
+		+ (location1.from_wall ? 1 : 0)
+		+ (location2.from_wall ? 1 : 0)
+		+ (environment.is_type_stationary(ingredient1)
+			&& location1.coordinate != location2.coordinate ? 1 : 0);
 
-	auto [agent_dist, path_length] = get_helper_agents_distance(location2.coordinate, location1.coordinate, state, handoff_agent, local_agents);
-	if (environment.is_type_stationary(ingredient1)) {
+
+	if (!environment.is_type_stationary(ingredient1)) {
+		auto [agent_dist, path_length] = get_helper_agents_distance(location1.coordinate, location2.coordinate, state, handoff_agent, local_agents);
 		if (agent_dist == 0) {
-			agent_dist += get_nearest_agent_distance(state, location2.coordinate, handoff_agent);
+			agent_dist += get_nearest_agent_distance(state, location1.coordinate, handoff_agent);
 		} else {
-			agent_dist += get_nearest_agent_distance(state, location2.coordinate, {});
+			agent_dist += get_nearest_agent_distance(state, location1.coordinate, {});
 		}
 		min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty);
-	} else {
-		auto [temp_dist1, temp_dist2] = get_helper_agents_distance(location1.coordinate, location2.coordinate, state, handoff_agent, local_agents);
-		min_dist = std::min(min_dist, temp_dist1 + temp_dist2 + wall_penalty);
 	}
+	auto [agent_dist, path_length] = get_helper_agents_distance(location2.coordinate, location1.coordinate, state, handoff_agent, local_agents);
+	if (agent_dist == 0) {
+		agent_dist += get_nearest_agent_distance(state, location2.coordinate, handoff_agent);
+	} else {
+		agent_dist += get_nearest_agent_distance(state, location2.coordinate, {});
+	}
+	min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty);
 	return min_dist;
 }
 

@@ -13,7 +13,7 @@ A_Star::A_Star(const Environment& environment, size_t depth_limit)
 std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 		Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) {
 	heuristic.set(recipe.ingredient1, recipe.ingredient2, agents, handoff_agent);
-	PRINT(Print_Category::A_STAR, std::string("\n\nStarting search ") + recipe.result_char() + " " + agents.to_string() +(handoff_agent.has_value() ? "/" + std::to_string(handoff_agent.value().id) : "") + "\n\n");
+	PRINT(Print_Category::A_STAR, Print_Level::DEBUG, std::string("\n\nStarting search ") + recipe.result_char() + " " + agents.to_string() +(handoff_agent.has_value() ? "/" + std::to_string(handoff_agent.value().id) : "") + "\n\n");
 
 	Node_Queue frontier;
 	Node_Set visited;

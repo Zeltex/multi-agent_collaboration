@@ -34,6 +34,7 @@ void solve(Environment& environment) {
 	//std::vector<std::string> paths{ "../levels/BD/full-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_tl.txt" };
+	//std::vector<std::string> paths{ "../levels/Test_Scenarios/L1.txt" };
 	
 	std::vector<Solution> solutions;
 
@@ -48,6 +49,7 @@ void solve(Environment& environment) {
 		}
 		while (!environment.is_done(state)) {
 			std::vector<Action> actions;
+			environment.print_state(state);
 			//for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
 			for (auto& planner : planners) {
 				actions.push_back(planner.get_next_action(state));
@@ -57,9 +59,9 @@ void solve(Environment& environment) {
 				break;
 			}
 			//environment.act(state, planner.get_next_action(state));
-			environment.print_state(state);
 			++action_count;
 		}
+		environment.print_state(state);
 		auto time_end = std::chrono::system_clock::now();
 
 		auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();

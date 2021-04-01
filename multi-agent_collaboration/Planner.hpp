@@ -42,7 +42,7 @@ struct Action_Path {
 
 	bool operator<(const Action_Path& other) const {
 		if (joint_actions.size() != other.joint_actions.size()) return joint_actions.size() < other.joint_actions.size();
-		if (agents.size() < other.agents.size()) return agents.size() < other.agents.size();
+		if (agents.size() != other.agents.size()) return agents.size() < other.agents.size();
 		return recipe < other.recipe;
 	}
 
@@ -125,6 +125,22 @@ struct Agent_Usefulnes {
 
 	float get_usefulness() const {
 		return ((int)excl_length - incl_length) / 2;
+	}
+
+	std::string get_usefulness_str() const {
+		if (excl_length == EMPTY_VAL) return "-";
+		return convert(get_usefulness());
+	}
+	std::string excl_length_str() const {
+		return convert(excl_length);
+	}
+
+	std::string convert(size_t val) const {
+		if (val == EMPTY_VAL) {
+			return "-";
+		} else {
+			return std::to_string(val);
+		}
 	}
 };
 

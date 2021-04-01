@@ -74,7 +74,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 	// Simple move
 	if (!is_cell_type(new_position, Cell_Type::WALL)) {
 		state.agents.at(action.agent.id).move_to(new_position);
-		PRINT(print_level, std::string("Moved ") + static_cast<char>(action.direction));
+		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Moved ") + static_cast<char>(action.direction));
 		return true;
 
 	// Goal condition
@@ -84,7 +84,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 			if (recipe.has_value()) {
 				agent.clear_item();
 				state.add_goal_item(new_position, recipe.value());
-				PRINT(print_level, std::string("goal ingredient delivered ") + static_cast<char>(recipe.value()));
+				PRINT(Print_Category::ENVIRONMENT, print_level, std::string("goal ingredient delivered ") + static_cast<char>(recipe.value()));
 				return true;
 			}
 		}
@@ -96,7 +96,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 			state.remove(new_position);
 			agent.clear_item();
 			state.add(new_position, recipe.value());
-			PRINT(print_level, std::string("Combine ") + static_cast<char>(recipe.value()));
+			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Combine ") + static_cast<char>(recipe.value()));
 			return true;
 		} else {
 			auto recipe_reverse = get_recipe(item_new_position.value(), item_old_position.value());
@@ -104,7 +104,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 				state.remove(new_position);
 				agent.clear_item();
 				state.add(new_position, recipe_reverse.value());
-				PRINT(print_level, std::string("Combine ") + static_cast<char>(recipe_reverse.value()));
+				PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Combine ") + static_cast<char>(recipe_reverse.value()));
 				return true;
 			}
 		}
@@ -115,12 +115,12 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 		if (recipe.has_value()) {
 			state.remove(new_position);
 			state.add(new_position, recipe.value());
-			PRINT(print_level, std::string("chop chop ") + static_cast<char>(recipe.value()));
+			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("chop chop ") + static_cast<char>(recipe.value()));
 			return true;
 		} else if (!item_old_position.has_value()){
 			state.remove(new_position);
 			agent.set_item(item_new_position.value());
-			PRINT(print_level, std::string("pickup"));
+			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("pickup"));
 			return true;
 		}
 
@@ -129,18 +129,18 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 	} else if (item_old_position.has_value()) {
 		agent.clear_item();
 		state.add(new_position, item_old_position.value());
-		PRINT(print_level, std::string("place ") + static_cast<char>(item_old_position.value()));
+		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("place ") + static_cast<char>(item_old_position.value()));
 		return true;
 
 	// Pickup
 	} else if (item_new_position.has_value()) {
 		state.remove(new_position);
 		agent.set_item(item_new_position.value());
-		PRINT(print_level, std::string("pickup ") + static_cast<char>(item_new_position.value()));
+		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("pickup ") + static_cast<char>(item_new_position.value()));
 		return true;
 	}
 	// They simply decided to hump a wall
-	PRINT(print_level, std::string("Nothing happened"));
+	PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Nothing happened"));
 	return false;
 }
 
@@ -306,11 +306,14 @@ void Environment::load_map_line(State& state, size_t& line_counter, const std::s
 		if (c == static_cast<char>(Cell_Type::DELIVERY_STATION)) delivery_stations.push_back({ index_counter, line_counter });
 
 		// State related
-		if (c == static_cast<char>(Ingredient::TOMATO)) 
-			state.items.insert({ {index_counter, line_counter}, Ingredient::TOMATO });
+		std::vector<Ingredient> state_ingredients { 
+			Ingredient::TOMATO, Ingredient::CHOPPED_TOMATO, Ingredient::LETTUCE, Ingredient::CHOPPED_LETTUCE, 
+			Ingredient::PLATE, Ingredient::PLATED_TOMATO, Ingredient::PLATED_LETTUCE, Ingredient::PLATED_SALAD, 
+			Ingredient::DELIVERED_TOMATO, Ingredient::DELIVERED_LETTUCE, Ingredient::DELIVERED_SALAD, Ingredient::SALAD };
 
-		if (c == static_cast<char>(Ingredient::LETTUCE)) state.items.insert({ {index_counter, line_counter}, Ingredient::LETTUCE });
-		if (c == static_cast<char>(Ingredient::PLATE)) state.items.insert({ {index_counter, line_counter}, Ingredient::PLATE });
+		for (const auto& ingredient : state_ingredients) {
+			if (c == static_cast<char>(ingredient)) state.items.insert({ {index_counter, line_counter}, ingredient });
+		}
 
 		++index_counter;
 	}
@@ -378,7 +381,7 @@ void Environment::play(State& state) const {
 		char c = line[0];
 		if (c >= '0' && c <= '9') {
 			agent = { static_cast<size_t>(atoi(&c)) };
-			PRINT(Print_Level::DEBUG, std::string("Switcharoo ") + c);
+			PRINT(Print_Category::ENVIRONMENT, Print_Level::DEBUG, std::string("Switcharoo ") + c);
 		} else {
 
 			std::vector<Action> actions;
