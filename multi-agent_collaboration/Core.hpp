@@ -3,8 +3,9 @@
 
 enum class Print_Level {
 	NOPE=0,
-	DEBUG=1,
-	INFO=2
+	VERBOSE,
+	DEBUG,
+	INFO
 };
 
 enum class Print_Category {
@@ -26,4 +27,4 @@ void print(Print_Category category, Print_Level level, const std::string& msg);
 #define PRINT(level_category, msg) print(level_category, msg)
 #define PRINT(category, level, msg) print(category, level, msg)
 
-#define EMPTY_VAL (size_t)-1
+#define EMPTY_VAL 9999

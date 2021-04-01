@@ -70,7 +70,7 @@ Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::v
 	}
 
 	for (const auto& agent_solution : agent_solutions) {
-		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, std::to_string(agent_solution.first.result_char()) + " : "
+		PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, std::to_string(agent_solution.first.result_char()) + " : "
 			+ std::to_string(agent_solution.second.incl_length) + "/"
 			+ agent_solution.second.excl_length_str() + " : "
 			+ agent_solution.second.get_usefulness_str() + '\n');
@@ -100,11 +100,11 @@ Action Planner::get_best_action(const std::set<Action_Path>& paths, const std::v
 			buffer<< "Agent " << agent.id << " chose action " <<
 				static_cast<char>(joint_action.actions.at(agent.id).direction) <<
 				" for subtask " << static_cast<char>(action_path.recipe.result) << std::endl;
-			PRINT(Print_Category::PLANNER, Print_Level::INFO, buffer.str());
+			PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
 			return joint_action.actions.at(agent.id);
 		}
 	}
-	PRINT(Print_Category::PLANNER, Print_Level::INFO, std::string("Agent ") + std::to_string(agent.id) + " did not find useful action \n");
+	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, std::string("Agent ") + std::to_string(agent.id) + " did not find useful action \n");
 	return { Direction::NONE, { agent } };
 }
 
@@ -149,7 +149,7 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 			for (const auto& agent : agents.get()) {
 				debug_string += std::to_string(agent.id) + ",";
 			}
-			PRINT(Print_Category::PLANNER, Print_Level::INFO, debug_string + ") : " + std::to_string(trim_path.size()) + " : " + static_cast<char>(recipe.result) +  " : " + std::to_string(diff) + '\n');
+			PRINT(Print_Category::PLANNER, Print_Level::DEBUG, debug_string + ") : " + std::to_string(trim_path.size()) + " : " + static_cast<char>(recipe.result) +  " : " + std::to_string(diff) + '\n');
 
 			if (agents.size() > 1) {
 				for (const auto& temp_agent : agents.get()) {
@@ -166,7 +166,7 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 						<< a_path.last_action_string() << " : " 
 						<< recipe.result_char() << " : " 
 						<< diff << std::endl;
-					PRINT(Print_Category::PLANNER, Print_Level::INFO, buffer.str());
+					PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
 				}
 			}
 		}
@@ -249,7 +249,7 @@ void Planner::recognize_goals() {
 	
 	// Calculate absolute value for each recipe/timestep
 	for (const auto& [recipe_Agents, history] : recipe_solutions) {
-		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, static_cast<char>(recipe_Agents.recipe.result) + recipe_Agents.agents.to_string() + "\t");
+		PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, static_cast<char>(recipe_Agents.recipe.result) + recipe_Agents.agents.to_string() + "\t");
 		for (float i = 0; i < time_step; ++i) {
 			if (history.get(time_step) == 0) {
 				data_raw.at(i).push_back(0);
@@ -263,7 +263,7 @@ void Planner::recognize_goals() {
 			}
 		}
 	}
-	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, "\n");
+	PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, "\n");
 
 
 	// Normalize per timestep
@@ -286,5 +286,5 @@ void Planner::recognize_goals() {
 		}
 		buffer << "\n";
 	}
-	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
+	PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
 }

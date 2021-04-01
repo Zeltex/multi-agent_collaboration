@@ -4,6 +4,7 @@
 #include <fstream>
 #include <algorithm>
 #include <set>
+#include <sstream>
 
 #include "State.hpp"
 
@@ -42,7 +43,7 @@ bool Environment::is_type_stationary(Ingredient ingredient) const {
 }
 
 bool Environment::act(State& state, const Joint_Action& action) const {
-	return act(state, action, Print_Level::DEBUG);
+	return act(state, action, Print_Level::VERBOSE);
 }
 
 bool Environment::act(State& state, const Joint_Action& joint_action, Print_Level print_level) const {
@@ -56,7 +57,7 @@ bool Environment::act(State& state, const Joint_Action& joint_action, Print_Leve
 }
 
 bool Environment::act(State& state, const Action& action) const {
-	return act(state, action, Print_Level::DEBUG);
+	return act(state, action, Print_Level::VERBOSE);
 }
 
 bool Environment::act(State& state, const Action& action, Print_Level print_level) const {
@@ -276,8 +277,9 @@ State Environment::load(const std::string& path) {
 			break;
 		}
 		}
-
-		std::cout << line_counter << ": " << line << std::endl;
+		std::stringstream buffer;
+		buffer << line_counter << ": " << line << std::endl;
+		PRINT(Print_Category::ENVIRONMENT, Print_Level::DEBUG, buffer.str());
 		++line_counter;
 	}
 
@@ -370,7 +372,8 @@ void Environment::print_state(const State& state) const {
 		}
 		buffer += '\n';
 	}
-	std::cout << buffer << std::endl;
+	buffer += '\n';
+	PRINT(Print_Category::ENVIRONMENT, Print_Level::DEBUG, buffer);
 }
 
 void Environment::play(State& state) const {
@@ -381,7 +384,7 @@ void Environment::play(State& state) const {
 		char c = line[0];
 		if (c >= '0' && c <= '9') {
 			agent = { static_cast<size_t>(atoi(&c)) };
-			PRINT(Print_Category::ENVIRONMENT, Print_Level::DEBUG, std::string("Switcharoo ") + c);
+			PRINT(Print_Category::ENVIRONMENT, Print_Level::VERBOSE, std::string("Switcharoo ") + c);
 		} else {
 
 			std::vector<Action> actions;

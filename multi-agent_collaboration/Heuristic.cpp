@@ -53,6 +53,10 @@ std::pair<size_t, size_t> Heuristic::get_helper_agents_distance(Coordinate sourc
 	while (true) {
 		auto& prev_dist = dist_ref.const_at(source, prev);
 		if (prev_dist.parent == source) break;
+		if (prev_dist.parent == Coordinate{EMPTY_VAL, EMPTY_VAL}) {
+			return { EMPTY_VAL, EMPTY_VAL };
+		}
+
 		auto next = prev_dist.parent;
 
 		++path_length;
@@ -109,6 +113,7 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 
 	if (!environment.is_type_stationary(ingredient1)) {
 		auto [agent_dist, path_length] = get_helper_agents_distance(location1.coordinate, location2.coordinate, state, handoff_agent, local_agents);
+		if (agent_dist == EMPTY_VAL || path_length == EMPTY_VAL) return EMPTY_VAL;
 		if (agent_dist == 0) {
 			agent_dist += get_nearest_agent_distance(state, location1.coordinate, handoff_agent);
 		} else {
@@ -117,6 +122,7 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 		min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty);
 	}
 	auto [agent_dist, path_length] = get_helper_agents_distance(location2.coordinate, location1.coordinate, state, handoff_agent, local_agents);
+	if (agent_dist == EMPTY_VAL || path_length == EMPTY_VAL) return EMPTY_VAL;
 	if (agent_dist == 0) {
 		agent_dist += get_nearest_agent_distance(state, location2.coordinate, handoff_agent);
 	} else {
