@@ -106,9 +106,9 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 	size_t min_dist = EMPTY_VAL;
 	size_t wall_penalty = (size_t)0
 		+ (location1.from_wall ? 1 : 0)
-		+ (location2.from_wall ? 1 : 0)
-		+ (environment.is_type_stationary(ingredient1)
-			&& location1.coordinate != location2.coordinate ? 1 : 0);
+		+ (location2.from_wall ? 1 : 0);
+		//+ (environment.is_type_stationary(ingredient1)
+		//	&& location1.coordinate != location2.coordinate ? 1 : 0);
 
 
 	if (!environment.is_type_stationary(ingredient1)) {

@@ -28,9 +28,9 @@ struct Solution {
 void solve(Environment& environment) {
 	//open-divider_salad.txt
 
-	//auto paths = get_all_files("../levels/BD/");
+	auto paths = get_all_files("../levels/BD/");
 	//std::vector<std::string> paths{ "../levels/BD/partial-divider_salad.txt" };
-	std::vector<std::string> paths{ "../levels/BD/partial-divider_tl.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/partial-divider_tl.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/full-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_tl.txt" };

@@ -96,7 +96,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 		if (recipe.has_value()) {
 			state.remove(new_position);
 			agent.clear_item();
-			state.add(new_position, recipe.value());
+			agent.set_item(recipe.value());
 			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Combine ") + static_cast<char>(recipe.value()));
 			return true;
 		} else {
@@ -104,23 +104,23 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 			if (recipe_reverse.has_value()) {
 				state.remove(new_position);
 				agent.clear_item();
-				state.add(new_position, recipe_reverse.value());
+				agent.set_item(recipe_reverse.value());
 				PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Combine ") + static_cast<char>(recipe_reverse.value()));
 				return true;
 			}
 		}
 
-	// Chop chop / pickup
-	} else if (is_cell_type(new_position, Cell_Type::CUTTING_STATION) && item_new_position.has_value()) {
-		auto recipe = get_recipe(Ingredient::CUTTING, item_new_position.value());
+	// Chop chop / place
+	} else if (is_cell_type(new_position, Cell_Type::CUTTING_STATION) && !item_new_position.has_value() && item_old_position.has_value()) {
+		auto recipe = get_recipe(Ingredient::CUTTING, item_old_position.value());
 		if (recipe.has_value()) {
-			state.remove(new_position);
-			state.add(new_position, recipe.value());
+			agent.clear_item();
+			agent.set_item(recipe.value());
 			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("chop chop ") + static_cast<char>(recipe.value()));
 			return true;
-		} else if (!item_old_position.has_value()){
-			state.remove(new_position);
-			agent.set_item(item_new_position.value());
+		} else {
+			agent.clear_item();
+			state.add(new_position, item_old_position.value());
 			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("pickup"));
 			return true;
 		}
@@ -308,10 +308,11 @@ void Environment::load_map_line(State& state, size_t& line_counter, const std::s
 		if (c == static_cast<char>(Cell_Type::DELIVERY_STATION)) delivery_stations.push_back({ index_counter, line_counter });
 
 		// State related
-		std::vector<Ingredient> state_ingredients { 
-			Ingredient::TOMATO, Ingredient::CHOPPED_TOMATO, Ingredient::LETTUCE, Ingredient::CHOPPED_LETTUCE, 
-			Ingredient::PLATE, Ingredient::PLATED_TOMATO, Ingredient::PLATED_LETTUCE, Ingredient::PLATED_SALAD, 
-			Ingredient::DELIVERED_TOMATO, Ingredient::DELIVERED_LETTUCE, Ingredient::DELIVERED_SALAD, Ingredient::SALAD };
+		const static std::vector<Ingredient> state_ingredients { 
+			Ingredient::TOMATO,				Ingredient::CHOPPED_TOMATO, Ingredient::LETTUCE, 
+			Ingredient::CHOPPED_LETTUCE, 	Ingredient::PLATE,			Ingredient::PLATED_TOMATO, 
+			Ingredient::PLATED_LETTUCE,		Ingredient::PLATED_SALAD, 	Ingredient::DELIVERED_TOMATO, 
+			Ingredient::DELIVERED_LETTUCE,	Ingredient::DELIVERED_SALAD,Ingredient::SALAD };
 
 		for (const auto& ingredient : state_ingredients) {
 			if (c == static_cast<char>(ingredient)) state.items.insert({ {index_counter, line_counter}, ingredient });
@@ -563,7 +564,7 @@ std::vector<Coordinate> Environment::get_coordinates(const State& state, Ingredi
 }
 
 std::vector<Coordinate> Environment::get_recipe_locations(const State& state, Ingredient ingredient) const {
-	exit(-1);
+	throw std::runtime_error("");
 }
 
 void Environment::reset() {
@@ -574,7 +575,6 @@ void Environment::reset() {
 	walls.clear();
 	cutting_stations.clear();
 	delivery_stations.clear();
-
 }
 
 

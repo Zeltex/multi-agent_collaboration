@@ -38,11 +38,6 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 			return {};
 		}
 
-		// Exceeded depth limit
-		if (current_node->f() >= depth_limit) {
-			continue;
-		}
-
 		//print_current(current_node);
 
 		for (const auto& action : actions) {
@@ -207,6 +202,14 @@ Node* A_Star::get_next_node(Node_Queue& frontier) const {
 	while (!frontier.empty()) {
 		auto current_node = frontier.top();
 		frontier.pop();
+
+		// Exceeded depth limit
+		if (current_node->f() >= depth_limit) {
+			current_node->closed = true;
+			continue;
+		}
+
+		// Unexplored and valid
 		if (!current_node->closed && current_node->valid) {
 			current_node->closed = true;
 			return current_node;
