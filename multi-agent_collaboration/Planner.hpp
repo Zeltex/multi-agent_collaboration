@@ -4,6 +4,7 @@
 #include "Core.hpp"
 #include "Search.hpp"
 #include "State.hpp"
+#include "Recogniser.hpp"
 
 #include <vector>
 #include <set>
@@ -43,7 +44,8 @@ struct Action_Path {
 	bool operator<(const Action_Path& other) const {
 		if (joint_actions.size() != other.joint_actions.size()) return joint_actions.size() < other.joint_actions.size();
 		if (agents.size() != other.agents.size()) return agents.size() < other.agents.size();
-		return recipe < other.recipe;
+		if (recipe != other.recipe) return recipe < other.recipe;
+		if (agents != other.agents) return agents < other.agents;
 	}
 
 	size_t size() const {
@@ -199,9 +201,9 @@ private:
 	void initialize_reachables(const State& initial_state);
 	void initialize_solutions();
 
-	void update_recipe_solutions(const std::set<Action_Path>& paths);
-	void recognize_goals();
+	void update_recogniser(const std::set<Action_Path>& paths);
 
+	Recogniser recogniser;
 	Search search;
 	Agent_Id agent;
 	Environment environment;

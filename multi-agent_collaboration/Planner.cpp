@@ -4,6 +4,9 @@
 #include "Search.hpp"
 #include "Search_Trimmer.hpp"
 #include "Utils.hpp"
+#include "Recogniser.hpp"
+#include "Sliding_Recogniser.hpp"
+#include "Bayesian_Recogniser.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -19,7 +22,9 @@
 constexpr auto INITIAL_DEPTH_LIMIT = 30;
 
 Planner::Planner(Environment environment, Agent_Id agent, const State& initial_state)
-	: agent(agent), environment(environment), time_step(0), search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT)) {
+	: agent(agent), environment(environment), time_step(0), 
+		search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT)),
+		recogniser(std::make_unique<Sliding_Recogniser>(environment, initial_state)) {
 
 	initialize_reachables(initial_state);
 	initialize_solutions();
@@ -31,8 +36,9 @@ Action Planner::get_next_action(const State& state) {
 		return { Direction::NONE, { agent } };
 	}
 	auto paths = get_all_paths(recipes, state);
-	update_recipe_solutions(paths);
-	recognize_goals();
+	update_recogniser(paths);
+	auto goals = recogniser.get_goals();
+	recogniser.print_probabilities();
 	auto action = get_best_action(paths, recipes);
 	++time_step;
 	return action;
@@ -174,10 +180,12 @@ std::set<Action_Path> Planner::get_all_paths(const std::vector<Recipe>& recipes,
 	return paths;
 }
 
-void Planner::update_recipe_solutions(const std::set<Action_Path>& paths) {
+void Planner::update_recogniser(const std::set<Action_Path>& paths) {
+	std::vector<Goal_Length> goal_lengths;
 	for (const auto& path : paths) {
-		recipe_solutions.at(Recipe_Agents{ path.recipe, path.agents }).add(path.joint_actions.size(), time_step);
+		goal_lengths.push_back(Goal_Length{ path.agents, path.recipe, path.joint_actions.size() });
 	}
+	recogniser.update(goal_lengths);
 }
 
 bool Planner::ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const {
@@ -243,48 +251,3 @@ void Planner::initialize_solutions() {
 	}
 }
 
-void Planner::recognize_goals() {
-	std::vector<std::vector<float>> data_raw(time_step);
-	std::vector<std::vector<float>> data_scaled;
-	
-	// Calculate absolute value for each recipe/timestep
-	for (const auto& [recipe_Agents, history] : recipe_solutions) {
-		PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, static_cast<char>(recipe_Agents.recipe.result) + recipe_Agents.agents.to_string() + "\t");
-		for (float i = 0; i < time_step; ++i) {
-			if (history.get(time_step) == 0) {
-				data_raw.at(i).push_back(0);
-			} else {
-				size_t time_diff = time_step - i;
-				size_t current_solution = history.get(time_step);
-				size_t previous_solution = history.get(i);
-				//size_t result = (previous_solution - time_diff) / current_solution;
-				//data_raw.at(i).push_back((history.get(time_step) - (time_step - i)) / history.get(i));
-				data_raw.at(i).push_back(history.get(i) / (history.get(time_step) + (time_step - i)));
-			}
-		}
-	}
-	PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, "\n");
-
-
-	// Normalize per timestep
-	for (const auto& entry : data_raw) {
-		float max_val = 1.0f;
-		//for (const auto& length : entry) max_val = std::max(max_val, length);
-		std::vector<float> scaled_row;
-		for (const auto& raw_entry : entry) {
-			scaled_row.push_back(round((raw_entry / max_val) * 1000) / 1000);
-		}
-		data_scaled.push_back(scaled_row);
-	}
-
-	// Debug print
-	std::stringstream buffer;
-	buffer << std::fixed << std::setprecision(3);
- 	for (const auto& data_row : data_scaled) {
-		for (const auto& data_entry : data_row) {
-			buffer << data_entry << '\t';
-		}
-		buffer << "\n";
-	}
-	PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
-}

@@ -66,7 +66,7 @@ enum class Ingredient {
 };
 
 struct Recipe {
-	Recipe(Ingredient ingredient1, Ingredient ingredient2, Ingredient result) :
+	constexpr Recipe(Ingredient ingredient1, Ingredient ingredient2, Ingredient result) :
 		ingredient1(ingredient1), ingredient2(ingredient2), result(result) {};
 	Ingredient ingredient1;
 	Ingredient ingredient2;
@@ -181,6 +181,8 @@ struct Agent {
 struct Agent_Combination {
 	Agent_Combination() : agents() { generate_pretty_print(); }
 	explicit Agent_Combination(std::vector<Agent_Id> agents) : agents(agents) { generate_pretty_print(); }
+	explicit Agent_Combination(Agent_Id agent) : agents(1, agent) { generate_pretty_print(); }
+
 	std::vector<Agent_Id> agents;
 	std::string pretty_print;
 
@@ -188,6 +190,14 @@ struct Agent_Combination {
 		if (agents.size() != other.agents.size()) return agents.size() < other.agents.size();
 		for (size_t i = 0; i < agents.size(); ++i) {
 			if (agents.at(i) != other.agents.at(i)) return agents.at(i) < other.agents.at(i);
+		}
+		return false;
+	}
+
+	bool operator!=(const Agent_Combination& other) const {
+		if (agents.size() != other.agents.size()) return true;
+		for (size_t i = 0; i < agents.size(); ++i) {
+			if (agents.at(i) != other.agents.at(i)) return true;
 		}
 		return false;
 	}
@@ -210,6 +220,11 @@ struct Agent_Combination {
 
 	const std::string& to_string() const {
 		return pretty_print;
+	}
+
+	void remove(Agent_Id agent) {
+		auto it = std::find(agents.begin(), agents.end(), agent);
+		if (it != agents.end())	agents.erase(it);
 	}
 private:
 	void generate_pretty_print() {

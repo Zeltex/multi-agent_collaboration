@@ -12,6 +12,11 @@ Goal Bayesian_Recogniser::get_goal(Agent_Id agent) {
 	throw std::runtime_error("Not implemented");
 }
 
-std::map<Agent_Id, Goal> Bayesian_Recogniser::get_goals() {
+std::map<Agent_Id, Goal> Bayesian_Recogniser::get_goals() const {
+	throw std::runtime_error("Not implemented");
+}
+
+
+void Bayesian_Recogniser::print_probabilities() const {
 	throw std::runtime_error("Not implemented");
 }
