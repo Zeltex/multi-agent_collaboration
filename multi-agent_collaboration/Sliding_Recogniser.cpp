@@ -7,7 +7,8 @@
 #include <iomanip>
 
 constexpr auto WINDOW_SIZE = 3; 
-constexpr auto alpha = 10.0f;			// Inverse weight of solution length in goal probability
+constexpr auto alpha = 30.0f;			// Inverse weight of solution length in goal probability
+constexpr auto beta = 0.9f;				// Adjust NONE probability scale
 
 Sliding_Recogniser::Sliding_Recogniser(const Environment& environment, const State& initial_state)
 	: Recogniser_Method(environment, initial_state), goals(), time_step(0) {
@@ -134,6 +135,8 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 		if (previous_active_status) {
 			progress_prob = 0.0f;
 		}
+
+		progress_prob *= beta;
 
 		max_prob = std::max(max_prob, progress_prob);
 
