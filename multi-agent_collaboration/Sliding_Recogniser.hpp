@@ -3,9 +3,13 @@
 #include "Recogniser.hpp"
 
 #include <cassert>
+#include <map>
+#include <vector>
 
 struct Goal_Entry {
-	Goal_Entry() : probability(EMPTY_PROB), lengths() {};
+	Goal_Entry() : probability(EMPTY_PROB), lengths(), 
+		length_prob(EMPTY_PROB), progress_prob(EMPTY_PROB) {};
+	
 	void add(size_t length, size_t time_step) {
 		if (!time_step == 0) {
 			while (lengths.size() < time_step - 1) {
@@ -29,6 +33,10 @@ struct Goal_Entry {
 
 	float probability;
 	std::vector<size_t> lengths;
+
+	// For debug
+	float length_prob;
+	float progress_prob;
 };
 
 class Sliding_Recogniser : public Recogniser_Method {
@@ -40,12 +48,12 @@ public:
 	void print_probabilities() const override;
 private:
 
-	void init(Goal goal);
 	void insert(const std::vector<Goal_Length>& goal_lengths);
 	float update_standard_probabilities(size_t base_window_index);
 	float update_non_probabilities(size_t base_window_index, size_t number_of_agents);
 	void normalise(float max_prob);
 
+	std::vector<std::vector<bool>> agents_active_status;
 	std::map<Goal, Goal_Entry> goals;
 	size_t time_step;
 };

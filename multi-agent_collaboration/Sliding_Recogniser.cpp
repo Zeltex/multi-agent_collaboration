@@ -9,9 +9,13 @@
 constexpr auto WINDOW_SIZE = 3; 
 constexpr auto alpha = 10.0f;			// Inverse weight of solution length in goal probability
 
-
-void Sliding_Recogniser::init(Goal goal) {
-	goals.insert({ goal,  {} }); 
+Sliding_Recogniser::Sliding_Recogniser(const Environment& environment, const State& initial_state)
+	: Recogniser_Method(environment, initial_state), goals(), time_step(0) {
+	for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
+		Goal goal{ Agent_Combination{ agent }, EMPTY_RECIPE };
+		goals.insert({ goal,  {} }); 
+		agents_active_status.emplace_back();
+	}
 }
 
 void Sliding_Recogniser::insert(const std::vector<Goal_Length>& goal_lengths) {
@@ -38,15 +42,18 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 		if (window_index == EMPTY_VAL) {
 			val.probability = EMPTY_PROB;
 		} else {
-			auto old_length = val.lengths.at(window_index);
-			auto length_prob = (alpha / (old_length + alpha));
+			auto new_length = val.lengths.at(time_step - 1);
+			auto length_prob = (alpha / (new_length + alpha));
 			//val.probability = (alpha * 1.0f / val.lengths.at(window_index))
 			auto progress_prob = ((float)val.lengths.at(window_index)) / (val.lengths.at(time_step - 1) + window_length);
 
 			if (window_length == 0) {
 				val.probability = length_prob;
+				val.length_prob = length_prob;		// debug
 			} else {
 				val.probability = length_prob * progress_prob;
+				val.length_prob = length_prob;		// debug
+				val.progress_prob = progress_prob;	// debug
 			}
 		}
 		if (val.probability > max_prob) max_prob = val.probability;
@@ -114,6 +121,17 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 	for (size_t agent = 0; agent < number_of_agents; ++agent) {
 		auto progress_prob = 1 - max_progress.at(agent);
 		if (time_step == 1) {
+			// Not NONE on first round by default
+			progress_prob = 0.0f;
+		}
+		// Note if previous window was optimal
+		bool previous_active_status = time_step == 1 ? true : agents_active_status.at(agent).back();
+		
+		// If entire window has been optimal
+		agents_active_status.at(agent).push_back(progress_prob == 0.0f);
+
+		// non-probability is 0% the step after having entire optimal window by default
+		if (previous_active_status) {
 			progress_prob = 0.0f;
 		}
 
@@ -132,13 +150,6 @@ void Sliding_Recogniser::normalise(float max_prob) {
 	}
 }
 
-Sliding_Recogniser::Sliding_Recogniser(const Environment& environment, const State& initial_state)
-	: Recogniser_Method(environment, initial_state), goals(), time_step(0) {
-	for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
-		Goal goal{ Agent_Combination{ agent }, EMPTY_RECIPE };
-		init(goal);
-	}
-}
 
 
 void Sliding_Recogniser::update(const std::vector<Goal_Length>& goal_lengths) {
@@ -189,11 +200,18 @@ void Sliding_Recogniser::print_probabilities() const {
 		PRINT(Print_Category::RECOGNISER, Print_Level::DEBUG, static_cast<char>(key.recipe.result) + key.agents.to_string() + "\t");
 	}
 
-	std::stringstream buffer;
-	buffer << std::fixed << std::setprecision(3) << '\n';
+	std::vector<std::stringstream> buffers(3);
+	for (auto& buffer : buffers) {
+		buffer << std::fixed << std::setprecision(3) << '\n';
+	}
 	for (const auto& [key, val] : goals) {
 		if (!val.is_current(time_step)) continue;
-		buffer << val.probability << "\t";
+		buffers.at(0) << val.length_prob << "\t";
+		buffers.at(1) << val.progress_prob << "\t";
+		buffers.at(2) << val.probability << "\t";
 	}
-	PRINT(Print_Category::RECOGNISER, Print_Level::DEBUG, buffer.str() + '\n');
+	buffers.at(2) << "\n\n";
+	for (auto& buffer : buffers) {
+		PRINT(Print_Category::RECOGNISER, Print_Level::DEBUG, buffer.str());
+	}
 }
