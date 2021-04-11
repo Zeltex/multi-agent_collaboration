@@ -6,8 +6,8 @@
 #include <sstream>
 #include <iomanip>
 
-constexpr auto WINDOW_SIZE = 5; 
-constexpr auto alpha = 100.0f;			// Inverse weight of solution length in goal probability
+constexpr auto WINDOW_SIZE = 3; 
+constexpr auto alpha = 10.0f;			// Inverse weight of solution length in goal probability
 
 
 void Sliding_Recogniser::init(Goal goal) {
@@ -56,40 +56,53 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 
 
 float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, size_t number_of_agents){
-	std::vector<float> max_diff(number_of_agents, 0.0f);
+	std::vector<float> max_progress(number_of_agents, 0.0f);
 	std::vector<bool> agents_useful(number_of_agents, false);
-	for (auto& [key, val] : goals) {
-		if (!val.is_current(time_step) || time_step == 1) {
+
+	// Record largest progression/diff towards a single goal/combination
+	for (auto& [goal, goal_entry] : goals) {
+		// Skip irrelevant goals and initial state
+		if (!goal_entry.is_current(time_step) || time_step == 1) {
 			continue;
 		}
-		size_t window_index = val.get_non_empty_index(base_window_index);
+		size_t window_index = goal_entry.get_non_empty_index(base_window_index);
+		
+		// Skip non-goals
 		if (window_index == EMPTY_VAL) {
 			continue;
 		}
 		size_t window_length = time_step - window_index - 1;
-		float progress = (float)val.lengths.at(window_index) - (val.lengths.at(time_step - 1));
-		float diff = 1 - (progress / window_length);
+		float absolute_progress = (float)goal_entry.lengths.at(window_index) - (goal_entry.lengths.at(time_step - 1));
+		float progress = absolute_progress / window_length;
 
-		diff = std::min(diff, 1.0f);
-		diff = std::max(diff, 0.0f);
+		progress = std::max(std::min(progress, 1.0f), 0.0f);
+		// TODO - Progress should probably also be recorded for single agent goals, even though this should
+		//		be covered by the multi agent cases
 
-		if (key.agents.size() > 1) {
-			for (auto& agent : key.agents.get()) {
+		if (goal.agents.size() > 1) {
+			for (auto& agent : goal.agents.get()) {
 				bool is_useful = true;
-				auto agent_prob = goals.at(Goal{ Agent_Combination{agent}, key.recipe }).probability;
-				auto agents = key.agents;
+				//auto agent_goal_it = goals.find(Goal{ Agent_Combination{agent}, goal.recipe });
+				//if (agent_goal_it == goals.end()) {
+				//	exit(-1);
+				//}
+				//auto agent_prob = agent_goal_it->second.probability;
+				auto agent_prob = goal_entry.probability;
+				auto agents = goal.agents;
 				agents.remove(agent);
 				auto combinations = get_combinations(agents);
 				for (auto& combination : combinations) {
-					if (goals.at(Goal(combination, key.recipe)).probability >= agent_prob) {
+
+					auto it = goals.find(Goal(combination, goal.recipe));
+					if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob) {
 						is_useful = false;
 						break;
 					}
 				}
 				if (is_useful) {
 					agents_useful.at(agent.id) = true;
-					auto& ref = max_diff.at(agent.id);
-					ref = std::max(ref, diff);
+					auto& ref = max_progress.at(agent.id);
+					ref = std::max(ref, progress);
 				}
 			}
 		}
@@ -99,15 +112,15 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 	// Update NONE probabilities
 	float max_prob = 0.0f;
 	for (size_t agent = 0; agent < number_of_agents; ++agent) {
-		auto& diff_ref = max_diff.at(agent);
-		if (!agents_useful.at(agent) && time_step > 1) {
-			diff_ref = 1.0f;	// Set NONE probability to 100%
+		auto progress_prob = 1 - max_progress.at(agent);
+		if (time_step == 1) {
+			progress_prob = 0.0f;
 		}
 
-		max_prob = std::max(max_prob, diff_ref);
+		max_prob = std::max(max_prob, progress_prob);
 
 		Goal goal{ Agent_Combination{ agent }, EMPTY_RECIPE };
-		goals.at(goal).probability = diff_ref;
+		goals.at(goal).probability = progress_prob;
 	}
 
 	return max_prob;

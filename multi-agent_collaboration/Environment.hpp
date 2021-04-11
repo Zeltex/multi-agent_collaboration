@@ -80,6 +80,9 @@ struct Recipe {
 	bool operator!=(const Recipe& other) const {
 		return (ingredient1 != other.ingredient1 || ingredient2 != other.ingredient2 || result != other.result);
 	}
+	bool operator==(const Recipe& other) const {
+		return (ingredient1 == other.ingredient1 && ingredient2 == other.ingredient2 && result == other.result);
+	}
 	char result_char() const {
 		return static_cast<char>(result);
 	}

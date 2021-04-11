@@ -19,7 +19,7 @@ struct Goal_Entry {
 		while (index < lengths.size() && lengths.at(index) == EMPTY_VAL) {
 			++index;
 		}
-		return index == lengths.size() ? EMPTY_VAL : index;
+		return index >= lengths.size() || lengths.empty() ? EMPTY_VAL : index;
 	}
 
 	bool is_current(size_t time_step) const {
