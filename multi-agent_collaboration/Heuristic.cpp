@@ -86,15 +86,37 @@ std::pair<size_t, size_t> Heuristic::get_helper_agents_distance(Coordinate sourc
 // Simply distance to nearest (non-handoff)agent
 size_t Heuristic::get_nearest_agent_distance(const State& state, Coordinate location, const std::optional<Agent_Id>& handoff_agent) const {
 	size_t min_dist = EMPTY_VAL;
+
+	// Penalty if handoff agent is holding item
+	size_t handoff_agent_penalty = 0;
+	if (handoff_agent.has_value()) {
+		if (state.agents.at(handoff_agent.value().id).coordinate == location) {
+			handoff_agent_penalty = 1;
+		}
+	}
+
 	for (const auto& agent : agents.get()) {
+
+		// Invalid agent
 		if (handoff_agent.has_value() && agent == handoff_agent.value().id) {
 			continue;
 		}
 		const auto& agent_coord = state.agents.at(agent.id).coordinate;
+
+		// Already holding
+		if (location == agent_coord) {
+			return 0;
+		}
 		auto temp_dist = distances.at(0).const_at(agent_coord, location).g;
+
+		// Penalty for holding item
+		if (state.agents.at(agent.id).item.has_value()) {
+			++temp_dist;
+		}
+
 		min_dist = std::min(min_dist, temp_dist);
 	}
-	return min_dist;
+	return min_dist + handoff_agent_penalty;
 }
 
 // Main heuristic calculation
