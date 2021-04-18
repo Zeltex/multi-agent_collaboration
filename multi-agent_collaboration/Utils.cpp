@@ -1,6 +1,9 @@
 #include "Utils.hpp"
-
 #include "Environment.hpp"
+
+#include <algorithm>
+#include <vector>
+#include <cassert>
 
 // Get all combinations of numbers/agents <n
 std::vector<Agent_Combination> get_combinations(Agent_Combination agents) {
@@ -19,6 +22,7 @@ std::vector<Agent_Combination> get_combinations(size_t n) {
 	return get_combinations(vec);
 }
 
+// All combinations of all sizes
 std::vector<Agent_Combination> get_combinations(std::vector<size_t> agents) {
 	if (agents.empty()) return {};
 	std::vector<bool> status;
@@ -55,6 +59,19 @@ std::vector<Agent_Combination> get_combinations(std::vector<size_t> agents) {
 		combinations.push_back(Agent_Combination(next_combination));
 	}
 	return combinations;
+}
+
+
+
+std::vector<Agent_Combination> get_permutations(Agent_Combination agents) {
+	std::vector<Agent_Combination> permutations;
+
+	std::vector<Agent_Id> current = agents.get();
+	std::sort(current.begin(), current.end());
+	do {
+		permutations.push_back(Agent_Combination{ current });
+	} while (std::next_permutation(current.begin(), current.end()));
+	return permutations;
 }
 
 Direction get_direction(Coordinate from, Coordinate to) {

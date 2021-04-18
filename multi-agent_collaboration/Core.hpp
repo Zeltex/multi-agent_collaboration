@@ -28,3 +28,4 @@ void print(Print_Category category, Print_Level level, const std::string& msg);
 #define PRINT(category, level, msg) print(category, level, msg)
 
 #define EMPTY_VAL 9999
+#define HIGH_INIT_VAL 99999

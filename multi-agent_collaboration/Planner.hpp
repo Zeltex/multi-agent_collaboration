@@ -80,6 +80,116 @@ struct Action_Path {
 	size_t last_action;		// Last useful action by main_agent
 };
 
+struct Subtask_Info {
+	size_t first_action;
+	size_t last_action;
+	size_t length;
+	Joint_Action next_action;
+	bool is_valid() const {
+		return length != 0 && length != EMPTY_VAL;
+	}
+	Action action(const Agent_Id& agent) const {
+		return next_action.get_action(agent);
+	}
+};
+struct Subtask_Entry {
+	Recipe recipe;
+	Agent_Combination agents;
+	bool operator<(const Subtask_Entry& other) const {
+		if (recipe != other.recipe) return recipe < other.recipe;
+		if (agents != other.agents) return agents < other.agents;
+		return false;
+	}
+};
+
+struct Paths {
+	Paths(size_t number_of_agents) 
+		: normal_paths(), handoff_info(number_of_agents), normal_info(number_of_agents), handoff_paths(number_of_agents){};
+
+	void insert(const std::vector<Joint_Action>& actions, Recipe recipe,
+		Agent_Combination agents, Agent_Id main_agent) {
+		Action_Path temp(actions, recipe, agents, main_agent);
+		for (size_t i = 0; i < normal_info.size(); ++i) {
+			normal_info.at(i).insert({
+				Subtask_Entry{recipe, agents},
+				Subtask_Info{temp.first_action, temp.last_action,
+					actions.size(), actions.at(0)} });
+		}
+		normal_paths.insert(temp);
+	}
+	
+	void insert(const std::vector<Joint_Action>& actions, Recipe recipe,
+		Agent_Combination agents, Agent_Id main_agent, Agent_Id handoff_agent) {
+		// TODO - A little inefficient to create an Action_Path just to get last_action
+		Action_Path dummy(actions, recipe, agents, handoff_agent);
+		handoff_info.at(handoff_agent.id).insert({ 
+			Subtask_Entry{recipe, agents}, 
+			Subtask_Info{dummy.first_action, dummy.last_action, actions.size(), 
+				actions.at(0)} });
+
+		Action_Path temp(actions, recipe, agents, main_agent);
+		handoff_paths.at(handoff_agent.id).insert(temp);
+	}
+	
+	const std::set<Action_Path>& get_normal() const { 
+		return normal_paths; 
+	}
+
+	std::optional<const Subtask_Info*> get_handoff(Agent_Id agent, const Subtask_Entry& entry) const { 
+		auto it = handoff_info.at(agent.id).find(entry); 
+		if (it == handoff_info.at(agent.id).end()) {
+			return {};
+		} else {
+			return &(it->second);
+		}
+	}
+
+	std::optional<const Subtask_Info*> get_normal(Agent_Id agent, const Subtask_Entry& entry) const {
+		auto it = normal_info.at(agent.id).find(entry);
+		if (it == normal_info.at(agent.id).end()) {
+			return {};
+		} else {
+			return &(it->second);
+		}
+	}
+
+	std::vector<std::set<Action_Path>> handoff_paths;
+	std::set<Action_Path> normal_paths;
+	std::vector<std::map<Subtask_Entry, Subtask_Info>> handoff_info;
+	std::vector<std::map<Subtask_Entry, Subtask_Info>> normal_info;
+};
+
+struct Collaboration_Info {
+	Collaboration_Info() : length(EMPTY_VAL), last_action(EMPTY_VAL), combination(), recipes(), 
+		next_action(), value(EMPTY_VAL) {};
+
+	Collaboration_Info(size_t length, size_t last_action, Agent_Combination combination, const std::vector<Recipe> recipes,
+		Action next_action)
+		: length(length), last_action(last_action), combination(combination), recipes(recipes), 
+			next_action(next_action), value(EMPTY_VAL) {};
+
+	std::string to_string() const {
+		std::string result;
+		for (const auto& recipe : recipes) {
+			result += recipe.result_char();
+		}
+		result += combination.to_string();
+		return result;
+	}
+
+	bool has_value() const {
+		return length != EMPTY_VAL;
+	}
+
+	size_t length;
+	size_t last_action;
+	Agent_Combination combination;
+	std::vector<Recipe> recipes;
+	Action next_action;
+
+	float value;
+};
+
 struct Recipe_Solution {
 	Agent_Combination agents;
 	size_t action_count;
@@ -186,6 +296,71 @@ struct Recipe_Agents {
 	}
 };
 
+struct Colab_Collection {
+	Colab_Collection() : infos(), tasks(0), value(EMPTY_VAL) {};
+
+	void add(const Collaboration_Info& info) {
+		tasks += info.recipes.size();
+		infos.push_back(info);
+	}
+
+	bool has_value() const {
+		return tasks != 0;
+	}
+
+	bool contains(const Agent_Combination& agent_combination) const {
+		for (const auto& agent : agent_combination.get()) {
+			for (const auto& info : infos) {
+				if (info.combination.contains(agent)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	bool contains(const std::vector<Recipe>& recipes_in) const {
+		for (const auto& recipe_in : recipes_in) {
+			for (const auto& info : infos) {
+				for (const auto& recipe : info.recipes) {
+					if (recipe_in.result == recipe.result) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	bool contains(const Recipe& recipe_in) const {
+		for (const auto& info : infos) {
+			for (const auto& recipe : info.recipes) {
+				if (recipe_in.result == recipe.result) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	void calculate_value(size_t max_agents) {
+		std::vector<float> values(max_agents, 0);
+		for (const auto& info : infos) {
+			for (const auto& agent : info.combination.get()) {
+				values.at(agent.id) += info.value * info.recipes.size();
+			}
+		}
+		value = 0;
+		for (const auto& entry_value : values) {
+			value = std::max(value, entry_value);
+		}
+	}
+
+	std::vector<Collaboration_Info> infos;
+	size_t tasks;
+	float value;
+};
+
 class Planner {
 
 
@@ -194,14 +369,22 @@ public:
 	Action get_next_action(const State& state);
 
 private:
-	std::set<Action_Path> get_all_paths(const std::vector<Recipe>& recipes, const State& state);
-	Action get_best_action(const std::set<Action_Path>& paths, const std::vector<Recipe>& recipes) const;
+	Paths get_all_paths(const std::vector<Recipe>& recipes, const State& state);
+	Action get_best_action(const Paths& paths, const std::vector<Recipe>& recipes) const;
 	bool agent_in_best_solution(const std::map<Recipe, Recipe_Solution>& best_solutions, const Action_Path& action_path) const;
 	bool ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const;
 	void initialize_reachables(const State& initial_state);
 	void initialize_solutions();
+	std::optional<Collaboration_Info> check_for_collaboration(const Paths& paths, 
+		const std::vector<Recipe>& recipes, const std::map<Agent_Id, Goal>& goals);
 
-	void update_recogniser(const std::set<Action_Path>& paths);
+	void update_recogniser(const Paths& paths);
+
+	Collaboration_Info get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
+		const size_t& max_tasks);
+	Colab_Collection get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
+		const size_t& max_tasks, Colab_Collection collection,
+		std::vector<Collaboration_Info>::const_iterator it_in);
 
 	Recogniser recogniser;
 	Search search;

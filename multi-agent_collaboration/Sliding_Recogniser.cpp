@@ -49,7 +49,8 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 			auto progress_prob = ((float)val.lengths.at(window_index)) / (val.lengths.at(time_step - 1) + window_length);
 
 			if (window_length == 0) {
-				val.probability = length_prob;
+				constexpr float new_goal_penalty = 0.8f;
+				val.probability = length_prob * new_goal_penalty;
 				val.length_prob = length_prob;		// debug
 			} else {
 				val.probability = length_prob * progress_prob;
@@ -80,6 +81,12 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 			continue;
 		}
 		size_t window_length = time_step - window_index - 1;
+
+		// To make sure e.g. T(0) does not make T(0,1) appear useless after handoff
+		if (window_index == time_step - 1) {
+			window_length += 1;
+		}
+
 		float absolute_progress = (float)goal_entry.lengths.at(window_index) - (goal_entry.lengths.at(time_step - 1));
 		float progress = absolute_progress / window_length;
 
@@ -197,6 +204,42 @@ std::map<Agent_Id, Goal> Sliding_Recogniser::get_goals() const {
 	return result;
 }
 
+
+std::map<Goal, float> Sliding_Recogniser::get_raw_goals() const {
+	throw std::runtime_error("Not implemented");
+}
+
+// False if subset of agents is as likely, true otherwise
+bool Sliding_Recogniser::is_probable(Goal goal_input) const {
+	auto it_input = goals.find(goal_input);
+	if (it_input == goals.end()) {
+		return false;
+	}
+	auto probability = it_input->second.probability;
+
+	for (size_t i = 0; i < goal_input.agents.size() - 1; ++i) {
+		auto combinations = get_combinations<Agent_Id>(goal_input.agents.get(), i+1);
+		for (auto& combination : combinations) {
+			Goal goal{ Agent_Combination{combination}, goal_input.recipe };
+			auto it = goals.find(goal);
+			if (it != goals.end() && it->second.probability >= probability) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+
+float Sliding_Recogniser::get_probability(const Goal& goal) const {
+	auto it = goals.find(goal);
+	if (it == goals.end()) {
+		return 0.0f;
+	} else {
+		return it->second.probability;
+	}
+}
+
 void Sliding_Recogniser::print_probabilities() const {
 	for (const auto& [key, val] : goals) {
 		if (!val.is_current(time_step)) continue;
@@ -213,7 +256,7 @@ void Sliding_Recogniser::print_probabilities() const {
 		buffers.at(1) << val.progress_prob << "\t";
 		buffers.at(2) << val.probability << "\t";
 	}
-	buffers.at(2) << "\n\n";
+	buffers.at(2) << "\n";
 	for (auto& buffer : buffers) {
 		PRINT(Print_Category::RECOGNISER, Print_Level::DEBUG, buffer.str());
 	}

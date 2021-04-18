@@ -273,7 +273,7 @@ void Heuristic::init() {
 			for (const auto& dist : temp_distances) {
 				for (const auto& destination : coordinates) {
 					auto& ref_dist = final_dist.at(source, destination);
-					if (ref_dist.g == EMPTY_VAL || dist.at(convert(destination)).g < ref_dist.g) {
+					if (ref_dist.g == EMPTY_VAL || dist.at(convert(destination)).g <= ref_dist.g) {
 						ref_dist = dist.at(convert(destination));
 					}
 				}
@@ -282,7 +282,7 @@ void Heuristic::init() {
 		}
 	}
 
-	//print_distances({ 5,1 }, 1);
+	//print_distances({ 5,5 }, 2);
 	//print_distances({ 5,1 }, 2);
 	//print_distances({ 0,1 }, 2);
 	//print_distances({ 5,0 }, 2);

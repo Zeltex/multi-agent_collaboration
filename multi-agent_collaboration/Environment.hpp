@@ -95,7 +95,14 @@ struct Action {
 	Agent_Id agent;
 
 	std::string to_string() const {
-		return std::to_string(static_cast<char>(direction)) + std::to_string(agent.id);
+		return std::string(1, static_cast<char>(direction)) + ":" + std::to_string(agent.id);
+	}
+
+	bool is_not_none() const {
+		return direction != Direction::NONE;
+	}
+	bool is_none() const {
+		return direction == Direction::NONE;
 	}
 };
 
@@ -121,7 +128,7 @@ struct Joint_Action {
 		return actions.at(agent.id).direction != Direction::NONE;
 	}
 
-	Action get_action(Agent_Id agent) const {
+	Action get_action(const Agent_Id& agent) const {
 		if (actions.size() <= agent.id) {
 			std::cerr << "Attempting to get action for agent " << agent.id << ", but action length is " << actions.size() << std::endl;
 			for (const auto& action : actions) {
@@ -207,6 +214,15 @@ struct Agent_Combination {
 
 	bool contains(Agent_Id agent) const {
 		return std::find(agents.begin(), agents.end(), agent) != agents.end();
+	}
+
+	size_t get_index(Agent_Id agent) const {
+		size_t counter = 0;
+		for (const auto& entry : agents) {
+			if (entry == agent) return counter;
+			else ++counter;
+		}
+		return EMPTY_VAL;
 	}
 
 	const std::vector<Agent_Id>& get() const {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <algorithm>
 
 #include "Environment.hpp"
 #include "State.hpp"
@@ -11,6 +12,26 @@ struct Goal_Length {
 	Agent_Combination agents;
 	Recipe recipe;
 	size_t length;
+};
+
+struct Multi_Goal {
+	Multi_Goal(const Agent_Combination& agents, const std::vector<Recipe>& recipes) 
+		: agents(agents), recipes(recipes) {};
+	Multi_Goal() : agents(), recipes() {};
+	bool operator<(const Multi_Goal& other) const {
+		if (agents != other.agents) return agents < other.agents;
+		if (recipes.size() != other.recipes.size()) return recipes.size() < other.recipes.size();
+		auto recipes1 = recipes;
+		auto recipes2 = other.recipes;
+		std::sort(recipes1.begin(), recipes1.end());
+		std::sort(recipes2.begin(), recipes2.end());
+		for (size_t i = 0; i < recipes.size(); ++i) {
+			if (recipes1.at(i) != recipes2.at(i)) return recipes1.at(i) < recipes2.at(i);
+		}
+		return false;
+	}
+	Agent_Combination agents;
+	std::vector<Recipe> recipes;
 };
 
 struct Goal {
@@ -32,7 +53,10 @@ public:
 	virtual void update(const std::vector<Goal_Length>& goal_lengths) = 0;
 	virtual Goal get_goal(Agent_Id agent) = 0;
 	virtual std::map<Agent_Id, Goal> get_goals() const = 0;
+	virtual std::map<Goal, float> get_raw_goals() const = 0;
+	virtual bool is_probable(Goal goal) const = 0;
 	virtual void print_probabilities() const = 0;
+	virtual float get_probability(const Goal& goal) const = 0;
 
 protected:
 	Environment environment;
@@ -53,12 +77,25 @@ public:
 		return recogniser_method->get_goal(agent); 
 	}
 	
+	// Returns single most probable goal for each agent
 	std::map<Agent_Id, Goal> get_goals() const { 
 		return recogniser_method->get_goals(); 
 	}
 
+	std::map<Goal, float> get_raw_goals() const {
+		return recogniser_method->get_raw_goals();
+	}
+
+	bool is_probable(Goal goal) const {
+		return recogniser_method->is_probable(goal);
+	}
+
 	void print_probabilities() const {
 		recogniser_method->print_probabilities();
+	}
+
+	float get_probability(const Goal& goal) const {
+		return recogniser_method->get_probability(goal);
 	}
 	
 private:

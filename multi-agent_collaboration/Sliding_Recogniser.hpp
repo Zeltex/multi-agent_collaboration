@@ -44,8 +44,12 @@ public:
 	Sliding_Recogniser(const Environment& environment, const State& initial_state);
 	void update(const std::vector<Goal_Length>& goal_lengths) override;
 	Goal get_goal(Agent_Id agent) override;
+	std::map<Goal, float> get_raw_goals() const override;
+	bool is_probable(Goal goal) const override;
 	std::map<Agent_Id, Goal> get_goals() const override;
 	void print_probabilities() const override;
+	float get_probability(const Goal& goal) const override;
+
 private:
 
 	void insert(const std::vector<Goal_Length>& goal_lengths);
