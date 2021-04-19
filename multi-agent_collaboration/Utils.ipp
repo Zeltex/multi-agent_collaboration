@@ -20,3 +20,28 @@ std::vector<std::vector<T>> get_combinations(const std::vector<T>& recipes, size
 	} while (std::prev_permutation(bitmask.begin(), bitmask.end()));
 	return combinations;
 }
+
+// All combinations of input (including duplicate entries) of size combination_size
+template <typename T>
+std::vector<std::vector<T>> get_combinations_duplicates(const std::vector<T>& input, size_t combination_size) {
+	size_t input_size = input.size();
+	std::vector<std::vector<T>> result;
+	std::vector<size_t> counters(combination_size, 0);
+	bool done = false;
+	while (!done) {
+		std::vector<T> data;
+		for (size_t i = 0; i < counters.size(); i++) {
+			data.push_back(input.at(counters[i]));
+		}
+		result.push_back(std::move(data));
+
+		// Advance indices
+		size_t index = 0;
+		while (!done && ++counters.at(index) >= input_size) {
+			counters.at(index++) = 0;
+			done = index >= counters.size();
+		}
+	}
+
+	return result;
+}

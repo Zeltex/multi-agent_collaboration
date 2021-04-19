@@ -15,6 +15,24 @@ bool State::operator<(const State& other) const {
 	return false;
 }
 
+
+size_t State::get_count(Ingredient ingredient) const {
+	size_t count = 0;
+	for (const auto& [coord, ingredient_entry] : items) {
+		if (ingredient == ingredient_entry) {
+			++count;
+		}
+	}
+
+	for (size_t i = 0; i < agents.size(); ++i) {
+		auto& agent_item = agents.at(i).item;
+		if (agent_item.has_value() && agent_item.value() == ingredient) {
+			++count;
+		}
+	}
+	return count;
+}
+
 std::optional<Ingredient> State::get_ingredient_at_position(Coordinate coordinate) const {
 	auto it = items.find(coordinate);
 	if (it != items.end()) {

@@ -376,7 +376,8 @@ private:
 	void initialize_reachables(const State& initial_state);
 	void initialize_solutions();
 	std::optional<Collaboration_Info> check_for_collaboration(const Paths& paths, 
-		const std::vector<Recipe>& recipes, const std::map<Agent_Id, Goal>& goals);
+		const std::vector<Recipe>& recipes, const std::map<Agent_Id, Goal>& goals, 
+		const State& state);
 
 	void update_recogniser(const Paths& paths);
 
@@ -385,6 +386,13 @@ private:
 	Colab_Collection get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
 		const size_t& max_tasks, Colab_Collection collection,
 		std::vector<Collaboration_Info>::const_iterator it_in);
+
+	std::pair<size_t, Agent_Combination> get_best_permutation(const Agent_Combination& agents, const std::vector<Recipe>& recipes, const Paths& paths,
+		const std::vector<std::vector<Agent_Id>>& agent_permutations);
+
+	Collaboration_Info get_action_from_permutation(const Agent_Combination& best_permutation,
+		const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
+		const size_t& best_length);
 
 	Recogniser recogniser;
 	Search search;

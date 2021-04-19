@@ -40,11 +40,13 @@ Action Planner::get_next_action(const State& state) {
 	update_recogniser(paths);
 	auto goals = recogniser.get_goals();
 	recogniser.print_probabilities();
-	//auto collaboration = check_for_collaboration(paths);
-	auto collaboration = check_for_collaboration(paths, recipes, goals);
+	auto collaboration = check_for_collaboration(paths, recipes, goals, state);
 	if (collaboration.has_value()) {
 		++time_step;
 		return collaboration.value().next_action;
+	} 
+	else {
+		return Action{ Direction::NONE, {agent } };
 	}
 
 	auto action = get_best_action(paths, recipes);
@@ -52,7 +54,9 @@ Action Planner::get_next_action(const State& state) {
 	return action;
 }
 
-std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& paths, const std::vector<Recipe>& recipes_in, const std::map<Agent_Id, Goal>& goals) {
+std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& paths, const std::vector<Recipe>& recipes_in, 
+	const std::map<Agent_Id, Goal>& goals, const State& state) {
+	
 	size_t total_agents = environment.get_number_of_agents();
 	std::vector<std::vector<std::vector<Recipe>>> all_recipe_combinations;
 	size_t recipe_in_size = recipes_in.size();
@@ -62,127 +66,29 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 
 	std::vector<Collaboration_Info> infos;
 
-	Collaboration_Info result;
-
 	auto agent_combinations = get_combinations(total_agents);
 	for (const auto& agents : agent_combinations) {
-		//if (!agents.contains(agent)) continue;
 		size_t agent_size = agents.size();
-		auto agent_permutations = get_permutations(agents);
+		auto agent_permutations = get_combinations_duplicates<Agent_Id>(agents.get(), agents.size());
 
 		// Iterate setups for agent_combination
 		for (size_t recipe_combination_index = 0; recipe_combination_index < agent_size && recipe_combination_index < recipe_in_size; ++recipe_combination_index) {
 			for (const auto& recipes : all_recipe_combinations.at(recipe_combination_index)) {
+				size_t recipes_size = recipes.size();
 				if (agents.size() == 1) {
 					Subtask_Entry entry{ recipes.at(0), agents };
 					auto info = paths.get_normal(agent, entry);
 					if (info.has_value()) {
 						auto& info_val = info.value();
-						result = { info_val->length, info_val->last_action, agents, recipes, info_val->action(agents.get().at(0)) };
+						Collaboration_Info result = { info_val->length, info_val->last_action, agents, recipes, info_val->action(agents.get().at(0)) };
 						infos.push_back(result);
 					}
 				} else {
-
-					size_t recipes_size = recipes.size();
-					Agent_Combination best_permutation;
-					size_t best_length = HIGH_INIT_VAL;
-
-					// Get value for this setup
-					for (const auto& agent_permutation : agent_permutations) {
-
-						bool permutation_valid = true;
-						size_t inner_length = 0;
-						for (size_t handoff_agent_index = 0; handoff_agent_index < recipes_size; ++handoff_agent_index) {
-							Subtask_Entry entry{ recipes.at(handoff_agent_index), agents };
-							auto info = paths.get_handoff(agent_permutation.agents.at(handoff_agent_index), entry);
-							if (info.has_value()) {
-								//inner_length += info.value()->length;
-								if (agent_permutation.size() == 2 && recipes_size == 2) {
-									size_t other_agent_index = 1 - handoff_agent_index; // exploits |agents|==2
-									Subtask_Entry entry_other{ recipes.at(other_agent_index), agents };
-									auto other_info = paths.get_handoff(agent_permutation.agents.at(other_agent_index), entry_other);
-
-									// If the other handoff is longer, this task will take longer to finish
-									size_t handoff_diff = 0;
-									if (other_info.value()->last_action == EMPTY_VAL) {
-										// Believe it has to be -1 to account for val vs index
-										handoff_diff = other_info.value()->length - 1 - info.value()->last_action;
-									} else if (other_info.value()->last_action > info.value()->last_action) {
-										handoff_diff = other_info.value()->last_action - info.value()->last_action;
-									}
-
-									inner_length = std::max(inner_length, info.value()->length + handoff_diff);
-								} else {
-									inner_length = std::max(inner_length, info.value()->length);
-								}
-							} else {
-								permutation_valid = false;
-								break;
-							}
-						}
-
-						if (permutation_valid && inner_length < best_length) {
-							best_length = inner_length;
-							best_permutation = agent_permutation;
-						}
-					}
-
+					auto[best_length, best_permutation] = get_best_permutation(agents, recipes, paths, agent_permutations);
 
 					//if (best_length != HIGH_INIT_VAL && (!result.has_value() || best_length < result.length)) {
 					if (best_length != HIGH_INIT_VAL) {
-
-						// Get next action for planning agent from best permutation
-						auto agent_index = best_permutation.get_index(agent);
-						Action action;
-						size_t last_action;
-
-						// Get next action from handoff
-						if (agent_index < recipes_size) {
-							Subtask_Entry entry{ recipes.at(agent_index), agents };
-							auto info = paths.get_handoff(agent, entry);
-							last_action = info.value()->last_action;
-
-							action = info.value()->action(agent);
-
-							// TODO - This should probably rather check if we are past
-							//			handoff time, as a none action could still be useful
-							
-							// TODO - May have to introduce a special property to mark actions as useless
-							//			since a none direction can still be useful
-							if (action.is_none()) {
-								std::set<size_t> skipped_recipes{ agent_index };
-								Action action_inner;
-								float highest_prob = 0.0f;
-								for (size_t i = 0; i < recipes_size; ++i) {
-									if (skipped_recipes.find(i) != skipped_recipes.end()) continue;
-									Subtask_Entry entry_inner{ recipes.at(i), agents };
-									auto info_inner = paths.get_handoff(i, entry_inner);
-									Goal goal_inner{ Agent_Combination{agent}, recipes.at(i) };
-									if (info_inner.has_value()
-										&& info_inner.value()->action(agent).is_not_none()
-										&& recogniser.get_probability(goal_inner) > highest_prob) {
-
-										action_inner = info_inner.value()->action(agent);
-										highest_prob = recogniser.get_probability(goal_inner);
-									}
-
-								}
-								action = action_inner;
-							}
-
-
-							// Get next action from non-handoff
-						} else {
-							// TODO - Not 100% sure what the agent should do when #agents > #tasks
-							// TODO - The 0 index assumes |tasks|==1 when |tasks|!=|agents|
-							Subtask_Entry entry{ recipes.at(0), agents };
-							auto info = paths.get_normal(agent, entry);
-							action = info.value()->action(agent);
-							last_action = info.value()->last_action;
-						}
-						auto sorted_agents = best_permutation.get();
-						std::sort(sorted_agents.begin(), sorted_agents.end());
-						result = { best_length, last_action, Agent_Combination{sorted_agents}, recipes, action };
+						auto result = get_action_from_permutation(best_permutation, recipes, paths, agents, best_length);
 						infos.push_back(result);
 					}
 				}
@@ -247,6 +153,36 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 						is_probable = false;
 						break;
 					}
+				}
+			}
+
+			// TODO - If recipes in combination are mutually exclusive, then not probable
+
+			std::map<Ingredient, size_t> ingredients;
+			for (const auto& recipe : info_entry.recipes) {
+				// Ingredient 1
+				auto it = ingredients.find(recipe.ingredient1);
+				if (it == ingredients.end()) {
+					ingredients.insert({ recipe.ingredient1, 1 });
+				} else {
+					++(it->second);
+				}
+
+				// Ingredient 2
+				it = ingredients.find(recipe.ingredient2);
+				if (it == ingredients.end()) {
+					ingredients.insert({ recipe.ingredient2, 1 });
+				} else {
+					++(it->second);
+				}
+			}
+
+			for (const auto& [ingredient, count] : ingredients) {
+				if (!environment.is_type_stationary(ingredient) 
+					&& state.get_count(ingredient) < count) {
+					
+					is_probable = false;
+					break;
 				}
 			}
 
@@ -320,6 +256,168 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 
 
 	//return (best_info == nullptr ? std::optional<Collaboration_Info>() : *best_info);
+}
+
+Collaboration_Info Planner::get_action_from_permutation(const Agent_Combination& best_permutation,
+	const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents, 
+	const size_t& best_length) {
+	
+	// Get next action for planning agent from best permutation
+	size_t recipes_size = recipes.size();
+	auto agent_index = best_permutation.get_index(agent);
+	Action action;
+	size_t last_action;
+
+	// Get next action from handoff
+	if (agent_index < recipes_size) {
+		Subtask_Entry entry{ recipes.at(agent_index), agents };
+		auto info = paths.get_handoff(agent, entry);
+		last_action = info.value()->last_action;
+
+		action = info.value()->action(agent);
+
+		// TODO - This should probably rather check if we are past
+		//			handoff time, as a none action could still be useful
+
+		// TODO - May have to introduce a special property to mark actions as useless
+		//			since a none direction can still be useful
+		if (action.is_none()) {
+			std::set<size_t> skipped_recipes{ agent_index };
+			Action action_inner;
+			float highest_prob = 0.0f;
+			for (size_t i = 0; i < recipes_size; ++i) {
+				if (skipped_recipes.find(i) != skipped_recipes.end()) continue;
+				Subtask_Entry entry_inner{ recipes.at(i), agents };
+				auto info_inner = paths.get_handoff(i, entry_inner);
+				Goal goal_inner{ Agent_Combination{agent}, recipes.at(i) };
+				if (info_inner.has_value()
+					&& info_inner.value()->action(agent).is_not_none()
+					&& recogniser.get_probability(goal_inner) > highest_prob) {
+
+					action_inner = info_inner.value()->action(agent);
+					highest_prob = recogniser.get_probability(goal_inner);
+				}
+
+			}
+			action = action_inner;
+		}
+
+
+		// Get next action from non-handoff
+	} else {
+		// TODO - Not 100% sure what the agent should do when #agents > #tasks
+		// TODO - The 0 index assumes |tasks|==1 when |tasks|!=|agents|
+		Subtask_Entry entry{ recipes.at(0), agents };
+		auto info = paths.get_normal(agent, entry);
+		action = info.value()->action(agent);
+		last_action = info.value()->last_action;
+	}
+	Collaboration_Info result = { best_length, last_action, agents, recipes, action };
+	return result;
+}
+
+struct Temp {
+	//const Subtask_Info* info;
+	mutable size_t length;
+	mutable size_t handoff_time;
+	mutable size_t handoff_agent_index;
+
+	bool operator<(const Temp& other) const {
+		if (handoff_time != other.handoff_time) return handoff_time < other.handoff_time;
+		return handoff_agent_index < other.handoff_agent_index;
+	}
+};
+
+std::pair<size_t, Agent_Combination> Planner::get_best_permutation(const Agent_Combination& agents, const std::vector<Recipe>& recipes, const Paths& paths,
+	const std::vector<std::vector<Agent_Id>>& agent_permutations) {
+
+	size_t recipes_size = recipes.size();
+	Agent_Combination best_permutation;
+	size_t best_length = HIGH_INIT_VAL;
+	size_t agent_size = agents.size();
+	bool is_valid_permutation = true;
+
+	// Get value for this setup
+	for (const auto& agent_permutation : agent_permutations) {
+
+		size_t length = 0;
+
+		// Note initial handoffs
+		std::vector<std::set<Temp>> agents_handoffs(agent_size, std::set<Temp>());
+		for (size_t handoff_agent_index = 0; handoff_agent_index < recipes_size; ++handoff_agent_index) {
+			Subtask_Entry entry{ recipes.at(handoff_agent_index), agents };
+			auto info_opt = paths.get_handoff(agent_permutation.at(handoff_agent_index), entry);
+			if (info_opt.has_value()) {
+				auto actual_agent = agent_permutation.at(handoff_agent_index);
+				agents_handoffs.at(actual_agent.id).insert(Temp{ info_opt.value()->length, info_opt.value()->last_action, handoff_agent_index });
+			
+			// No solution with current handoff configuration
+			} else {
+				is_valid_permutation = false;
+				break;
+			}
+		}
+		if (!is_valid_permutation) {
+			continue;
+		}
+
+		// Record adjusted handoffs for each agent, and max handoff
+		// Handoff for agent x entry y is sum(0, ..., y), since an agent
+		// can only do one subtask at a time
+		std::vector<size_t> longest_agent_handoffs(agent_size, 0);
+		size_t longest_handoff = 0;
+		size_t agent_counter = 0;
+		for (auto& agent_handoffs : agents_handoffs) {
+			size_t running_handoff_time = 0;
+			for (auto& temp : agent_handoffs) {
+				if (temp.handoff_time != EMPTY_VAL) {
+					temp.length += running_handoff_time;
+					temp.handoff_time += running_handoff_time;
+					running_handoff_time = temp.handoff_time;
+
+
+					size_t current_handoff = temp.handoff_time;
+
+					longest_handoff = std::max(longest_handoff, current_handoff);
+
+					auto& handoff_ref = longest_agent_handoffs.at(agent_counter);
+					handoff_ref = std::max(handoff_ref, current_handoff);
+				}
+			}
+			++agent_counter;
+		}
+
+		// Record expected lengths with adjusted handoffs
+		agent_counter = 0;
+		for (auto& agent_handoffs : agents_handoffs) {
+
+			// Find max handoff by other agents
+			size_t max_handoff = 0;
+			for (size_t i = 0; i < longest_agent_handoffs.size(); ++i) {
+				if (i == agent_counter) {
+					continue;
+				}
+				max_handoff = std::max(max_handoff, longest_agent_handoffs.at(i));
+			}
+
+			// Iterate current agent handoffs
+			for (auto& temp : agent_handoffs) {
+				size_t handoff_penalty = 0;
+				if (temp.handoff_time < max_handoff) {
+					handoff_penalty = max_handoff - temp.handoff_time;
+				}
+				size_t length_inner = temp.length + handoff_penalty;
+				length = std::max(length, length_inner);
+			}
+			++agent_counter;
+		}
+
+		if (length < best_length) {
+			best_length = length;
+			best_permutation = Agent_Combination{ agent_permutation };
+		}
+	}
+	return { best_length, best_permutation };
 }
 
 Collaboration_Info Planner::get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
