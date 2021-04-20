@@ -22,8 +22,8 @@
 constexpr auto INITIAL_DEPTH_LIMIT = 30;
 constexpr auto GAMMA = 1.01;
 
-Planner::Planner(Environment environment, Agent_Id agent, const State& initial_state)
-	: agent(agent), environment(environment), time_step(0), 
+Planner::Planner(Environment environment, Agent_Id planning_agent, const State& initial_state)
+	: planning_agent(planning_agent), environment(environment), time_step(0), 
 		search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT)),
 		recogniser(std::make_unique<Sliding_Recogniser>(environment, initial_state)) {
 
@@ -34,7 +34,7 @@ Planner::Planner(Environment environment, Agent_Id agent, const State& initial_s
 Action Planner::get_next_action(const State& state) {
 	auto recipes = environment.get_possible_recipes(state);
 	if (recipes.empty()) {
-		return { Direction::NONE, { agent } };
+		return { Direction::NONE, { planning_agent } };
 	}
 	auto paths = get_all_paths(recipes, state);
 	update_recogniser(paths);
@@ -46,7 +46,7 @@ Action Planner::get_next_action(const State& state) {
 		return collaboration.value().next_action;
 	} 
 	else {
-		return Action{ Direction::NONE, {agent } };
+		return Action{ Direction::NONE, {planning_agent } };
 	}
 
 	auto action = get_best_action(paths, recipes);
@@ -77,14 +77,14 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 				size_t recipes_size = recipes.size();
 				if (agents.size() == 1) {
 					Subtask_Entry entry{ recipes.at(0), agents };
-					auto info = paths.get_normal(agent, entry);
+					auto info = paths.get_normal(planning_agent, entry);
 					if (info.has_value()) {
 						auto& info_val = info.value();
 						Collaboration_Info result = { info_val->length, info_val->last_action, agents, recipes, info_val->action(agents.get().at(0)) };
 						infos.push_back(result);
 					}
 				} else {
-					auto[best_length, best_permutation] = get_best_permutation(agents, recipes, paths, agent_permutations);
+					auto[best_length, best_permutation] = get_best_permutation(agents, recipes, paths, agent_permutations, state);
 
 					//if (best_length != HIGH_INIT_VAL && (!result.has_value() || best_length < result.length)) {
 					if (best_length != HIGH_INIT_VAL) {
@@ -217,12 +217,12 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 
 	std::stringstream buffer3;
 	if (info.has_value()) {
-		buffer3 << "Agent " << agent.id << " chose " << info.to_string() << " action " 
+		buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action " 
 			<< info.next_action.to_string() << "\n";
 		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
 		return info;
 	} else {
-		buffer3 << "Agent " << agent.id << " did not find relevant action\n";
+		buffer3 << "Agent " << planning_agent.id << " did not find relevant action\n";
 		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
 		return {};
 	}
@@ -259,61 +259,128 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 }
 
 Collaboration_Info Planner::get_action_from_permutation(const Agent_Combination& best_permutation,
-	const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents, 
+	const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
 	const size_t& best_length) {
-	
-	// Get next action for planning agent from best permutation
-	size_t recipes_size = recipes.size();
-	auto agent_index = best_permutation.get_index(agent);
-	Action action;
-	size_t last_action;
 
-	// Get next action from handoff
-	if (agent_index < recipes_size) {
-		Subtask_Entry entry{ recipes.at(agent_index), agents };
-		auto info = paths.get_handoff(agent, entry);
-		last_action = info.value()->last_action;
+	auto [last_action, info] = get_actions_from_permutation_inner(best_permutation, recipes, paths, agents, planning_agent);
 
-		action = info.value()->action(agent);
+	if (info == nullptr) {
+		return Collaboration_Info{ best_length, last_action, agents, recipes, {Direction::NONE, planning_agent} };
+	} else {
+		return Collaboration_Info{ best_length, last_action, agents, recipes, info->action(planning_agent) };
+	}
+}
 
-		// TODO - This should probably rather check if we are past
-		//			handoff time, as a none action could still be useful
+constexpr size_t action_trace_length = 3;
+bool Planner::is_conflict_in_permutation(const Agent_Combination& permutation,
+	const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
+	const State& initial_state) {
 
-		// TODO - May have to introduce a special property to mark actions as useless
-		//			since a none direction can still be useful
-		if (action.is_none()) {
-			std::set<size_t> skipped_recipes{ agent_index };
-			Action action_inner;
-			float highest_prob = 0.0f;
-			for (size_t i = 0; i < recipes_size; ++i) {
-				if (skipped_recipes.find(i) != skipped_recipes.end()) continue;
-				Subtask_Entry entry_inner{ recipes.at(i), agents };
-				auto info_inner = paths.get_handoff(i, entry_inner);
-				Goal goal_inner{ Agent_Combination{agent}, recipes.at(i) };
-				if (info_inner.has_value()
-					&& info_inner.value()->action(agent).is_not_none()
-					&& recogniser.get_probability(goal_inner) > highest_prob) {
+	auto largest_agent = agents.get_largest();
 
-					action_inner = info_inner.value()->action(agent);
-					highest_prob = recogniser.get_probability(goal_inner);
-				}
+	std::vector<Joint_Action> actions(action_trace_length, std::vector<Action>(largest_agent.id + 1));
 
+	// Get expected actions for each agent involved
+	for (const auto& acting_agent : agents.get()) {
+		auto [last_action, info] = get_actions_from_permutation_inner(permutation, recipes, paths, agents, acting_agent);
+
+
+		size_t action_index = 0;
+		if (info != nullptr) {
+			for (const auto& action : info->actions->joint_actions) {
+				if (action_index == action_trace_length) break;
+				actions.at(action_index).actions.at(acting_agent.id) = action.actions.at(acting_agent.id);
+				++action_index;
 			}
-			action = action_inner;
 		}
 
-
-		// Get next action from non-handoff
-	} else {
-		// TODO - Not 100% sure what the agent should do when #agents > #tasks
-		// TODO - The 0 index assumes |tasks|==1 when |tasks|!=|agents|
-		Subtask_Entry entry{ recipes.at(0), agents };
-		auto info = paths.get_normal(agent, entry);
-		action = info.value()->action(agent);
-		last_action = info.value()->last_action;
+		// Fill rest with none actions
+		while (action_index < action_trace_length) {
+			actions.at(action_index).actions.at(acting_agent.id) = { Direction::NONE, acting_agent };
+			++action_index;
+		}
 	}
-	Collaboration_Info result = { best_length, last_action, agents, recipes, action };
-	return result;
+
+	// Perform actions, check for invalid/collisions
+	auto state = initial_state;
+	for (const auto& action : actions) {
+		
+		// If all actions are none, there is no conflict by default
+		bool is_all_none = true;
+		for (const auto& single_action : action.actions) {
+			if (single_action.is_not_none()) {
+				is_all_none = false;
+			}
+		}
+		if (is_all_none) {
+			continue;
+		}
+
+		// Check if actions are successful
+		if (!environment.act(state, action)) {
+			std::stringstream buffer;
+			buffer << "Found conflict in permutation " << permutation.to_string() << " for recipes ";
+			for (const auto& recipe : recipes) {
+				buffer << recipe.result_char();
+			}
+			buffer << "\n";
+
+			PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
+			return true;
+		}
+	}
+	return false;
+}
+
+// TODO - This should probably rather check if we are past
+//			handoff time, as a none action could still be useful
+
+// TODO - May have to introduce a special property to mark actions as useless
+//			since a none direction can still be useful
+
+// TODO - Need to be able to do this for all agents, so agent should be specifiable
+std::pair<size_t, const Subtask_Info*> Planner::get_actions_from_permutation_inner(const Agent_Combination& best_permutation,
+	const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents, const Agent_Id& acting_agent) {
+	
+	size_t recipes_size = recipes.size();
+
+	// TODO - Agent may have multiple tasks
+	auto agent_index = best_permutation.get_index(acting_agent);
+
+	// If agent is responsible for handoff
+	if (agent_index < recipes_size) {
+		auto info = paths.get_handoff(acting_agent, Subtask_Entry{ recipes.at(agent_index), agents });
+		Action action = info.value()->action(acting_agent);
+
+		// TODO - Should use some special 'useless' value isntead of none
+		if (action.is_not_none()) {
+			return { info.value()->last_action, info.value() };
+		}
+	}
+
+	// TODO - Should maybe use the lowest value entry with acceptably high probability
+	// If agent is NOT responsible for handoff
+	float highest_prob = 0.0f;
+	const Subtask_Info* best_info = nullptr;
+	for (size_t i = 0; i < recipes_size; ++i) {
+		auto info = paths.get_handoff(best_permutation.get(i), Subtask_Entry{ recipes.at(i), agents });
+		Goal goal{ Agent_Combination{acting_agent}, recipes.at(i) };
+		if (info.has_value()
+			&& info.value()->action(acting_agent).is_not_none()
+			&& recogniser.get_probability(goal) > highest_prob) {
+
+			best_info = info.value();
+			highest_prob = recogniser.get_probability(goal);
+		}
+	}
+
+	// Return info if valid found
+	size_t last_action = EMPTY_VAL;
+	if (best_info == nullptr) {
+		return { last_action, nullptr };
+	} else {
+		return { last_action, best_info };
+	}
 }
 
 struct Temp {
@@ -328,8 +395,9 @@ struct Temp {
 	}
 };
 
-std::pair<size_t, Agent_Combination> Planner::get_best_permutation(const Agent_Combination& agents, const std::vector<Recipe>& recipes, const Paths& paths,
-	const std::vector<std::vector<Agent_Id>>& agent_permutations) {
+std::pair<size_t, Agent_Combination> Planner::get_best_permutation(const Agent_Combination& agents, 
+	const std::vector<Recipe>& recipes, const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
+	const State& state) {
 
 	size_t recipes_size = recipes.size();
 	Agent_Combination best_permutation;
@@ -349,7 +417,8 @@ std::pair<size_t, Agent_Combination> Planner::get_best_permutation(const Agent_C
 			auto info_opt = paths.get_handoff(agent_permutation.at(handoff_agent_index), entry);
 			if (info_opt.has_value()) {
 				auto actual_agent = agent_permutation.at(handoff_agent_index);
-				agents_handoffs.at(actual_agent.id).insert(Temp{ info_opt.value()->length, info_opt.value()->last_action, handoff_agent_index });
+				agents_handoffs.at(actual_agent.id).insert(
+					Temp{ info_opt.value()->length, info_opt.value()->last_action, handoff_agent_index });
 			
 			// No solution with current handoff configuration
 			} else {
@@ -358,6 +427,10 @@ std::pair<size_t, Agent_Combination> Planner::get_best_permutation(const Agent_C
 			}
 		}
 		if (!is_valid_permutation) {
+			continue;
+		}
+
+		if (is_conflict_in_permutation(Agent_Combination{ agent_permutation }, recipes, paths, agents, state)) {
 			continue;
 		}
 
@@ -427,7 +500,7 @@ Collaboration_Info Planner::get_best_collaboration(const std::vector<Collaborati
 	auto collection = get_best_collaboration_rec(infos, max_tasks, Colab_Collection{}, infos.begin());
 	Collaboration_Info best_info;
 	for (const auto& info : collection.infos) {
-		if (info.combination.contains(agent) && info.value < best_info.value) {
+		if (info.combination.contains(planning_agent) && info.value < best_info.value) {
 			best_info = info;
 		}
 	}
@@ -486,7 +559,7 @@ Action Planner::get_best_action(const Paths& paths, const std::vector<Recipe>& r
 		}
 
 		// Note usefulness of agent for recipe
-		agent_solutions.at(action_path.recipe).update(action_path, agent);
+		agent_solutions.at(action_path.recipe).update(action_path, planning_agent);
 
 		//auto& agent_solution = agent_solutions.at(action_path.recipe);
 		//if (action_path.agents.contains(agent)) {
@@ -524,22 +597,22 @@ Action Planner::get_best_action(const Paths& paths, const std::vector<Recipe>& r
 			auto& joint_action = action_path.joint_actions.at(0);
 			
 			std::stringstream buffer;
-			buffer<< "Agent " << agent.id << " chose action " <<
-				static_cast<char>(joint_action.actions.at(agent.id).direction) <<
+			buffer<< "Agent " << planning_agent.id << " chose action " <<
+				static_cast<char>(joint_action.actions.at(planning_agent.id).direction) <<
 				" for subtask " << static_cast<char>(action_path.recipe.result) << std::endl;
 			PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
-			return joint_action.actions.at(agent.id);
+			return joint_action.actions.at(planning_agent.id);
 		}
 	}
-	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, std::string("Agent ") + std::to_string(agent.id) + " did not find useful action \n");
-	return { Direction::NONE, { agent } };
+	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, std::string("Agent ") + std::to_string(planning_agent.id) + " did not find useful action \n");
+	return { Direction::NONE, { planning_agent } };
 }
 
 bool Planner::agent_in_best_solution(const std::map<Recipe, Recipe_Solution>& best_solutions, 
 		const Action_Path& action_path) const {
 	
 	auto& best_agents = best_solutions.at(action_path.recipe).agents;
-	return best_agents.contains(agent);
+	return best_agents.contains(planning_agent);
 }
 
 Paths Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& state) {
@@ -571,7 +644,7 @@ Paths Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& st
 				trim.trim(trim_path, state, environment, recipe);
 
 
-				paths.insert(trim_path, recipe, agents, agent);
+				paths.insert(trim_path, recipe, agents, planning_agent);
 			}
 
 			std::string debug_string = "(";
@@ -588,19 +661,22 @@ Paths Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& st
 					time_end = std::chrono::system_clock::now();
 					diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 
-					Action_Path a_path{ path, recipe, agents, agent };
-					
-					paths.insert(path, recipe, agents, agent, handoff_agent);
-					
-					std::stringstream buffer;
-					buffer << agents.to_string() << "/"
-						<< handoff_agent.to_string() << " : " 
-						<< a_path.size() << " ("
-						<< a_path.first_action_string() << "-" 
-						<< a_path.last_action_string() << ") : " 
-						<< recipe.result_char() << " : " 
-						<< diff << std::endl;
-					PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
+						Action_Path a_path{ path, recipe, agents, planning_agent };
+
+
+						std::stringstream buffer;
+						buffer << agents.to_string() << "/"
+							<< handoff_agent.to_string() << " : "
+							<< a_path.size() << " ("
+							<< a_path.first_action_string() << "-"
+							<< a_path.last_action_string() << ") : "
+							<< recipe.result_char() << " : "
+							<< diff << std::endl;
+						PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
+
+					if (!path.empty()) {
+						paths.insert(path, recipe, agents, planning_agent, handoff_agent);
+					}
 				}
 			}
 		}

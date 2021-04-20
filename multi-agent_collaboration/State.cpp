@@ -15,6 +15,16 @@ bool State::operator<(const State& other) const {
 	return false;
 }
 
+std::optional<Agent_Id> State::get_agent(Coordinate coordinate) const {
+	size_t agent_index = 0;
+	for (const auto& agent : agents) {
+		if (agent.coordinate == coordinate) {
+			return { agent_index };
+		}
+		++agent_index;
+	}
+	return {};
+}
 
 size_t State::get_count(Ingredient ingredient) const {
 	size_t count = 0;

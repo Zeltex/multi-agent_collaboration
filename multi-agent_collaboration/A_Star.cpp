@@ -22,7 +22,7 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 	Node* goal_node = nullptr;
 	auto actions = get_actions(agents, handoff_agent.has_value());
 	auto source = original_state;
-	source.purge(agents);
+	//source.purge(agents);
 
 	initialize_variables(frontier, visited, nodes, source, handoff_agent);
 

@@ -8,6 +8,7 @@
 #include <string>
 #include <optional>
 #include <iostream>
+#include <cassert>
 
 using Coordinate = std::pair<size_t, size_t> ;
 
@@ -224,6 +225,20 @@ struct Agent_Combination {
 		}
 		return EMPTY_VAL;
 	}
+	Agent_Id get(size_t index) const {
+		assert(index < agents.size());
+		return agents.at(index);
+	}
+
+	Agent_Id get_largest() const {
+		Agent_Id largest = agents.at(0);
+		for (const auto& agent : agents) {
+			if (largest < agent) {
+				largest = agent;
+			}
+		}
+		return largest;
+	}
 
 	const std::vector<Agent_Id>& get() const {
 		return agents;
@@ -245,6 +260,7 @@ struct Agent_Combination {
 		auto it = std::find(agents.begin(), agents.end(), agent);
 		if (it != agents.end())	agents.erase(it);
 	}
+
 private:
 	void generate_pretty_print() {
 		pretty_print = "(";

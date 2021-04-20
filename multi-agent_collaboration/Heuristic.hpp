@@ -46,6 +46,8 @@ private:
 		const std::optional<Agent_Id>& handoff_agent, const Agent_Combination& local_agents) const;
 	
 	size_t get_nearest_agent_distance(const State& state, Coordinate location, const std::optional<Agent_Id>& handoff_agent) const;
+	size_t get_non_participating_agent_holding_penalty(const Location& location1,
+		const Location& location2, const State& state, const Agent_Combination& local_agents) const;
 	size_t convert(const Coordinate& coord1) const;
 	void print_distances(Coordinate coordinate, size_t agent_number) const;
 	void init();

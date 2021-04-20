@@ -9,6 +9,7 @@
 #include <vector>
 #include <set>
 #include <algorithm> 
+#include <deque>
 
 struct Action_Path {
 	Action_Path(std::vector<Joint_Action> joint_actions,
@@ -85,6 +86,7 @@ struct Subtask_Info {
 	size_t last_action;
 	size_t length;
 	Joint_Action next_action;
+	Action_Path* actions;
 	bool is_valid() const {
 		return length != 0 && length != EMPTY_VAL;
 	}
@@ -104,7 +106,8 @@ struct Subtask_Entry {
 
 struct Paths {
 	Paths(size_t number_of_agents) 
-		: normal_paths(), handoff_info(number_of_agents), normal_info(number_of_agents), handoff_paths(number_of_agents){};
+		: normal_paths(), handoff_info(number_of_agents), normal_info(number_of_agents), 
+		handoff_paths(number_of_agents){};
 
 	void insert(const std::vector<Joint_Action>& actions, Recipe recipe,
 		Agent_Combination agents, Agent_Id main_agent) {
@@ -121,14 +124,16 @@ struct Paths {
 	void insert(const std::vector<Joint_Action>& actions, Recipe recipe,
 		Agent_Combination agents, Agent_Id main_agent, Agent_Id handoff_agent) {
 		// TODO - A little inefficient to create an Action_Path just to get last_action
-		Action_Path dummy(actions, recipe, agents, handoff_agent);
+		Action_Path action_path(actions, recipe, agents, handoff_agent);
+		handoff_paths.at(handoff_agent.id).push_back(action_path);
+		Action_Path* path_ptr = &handoff_paths.at(handoff_agent.id).back();
+
 		handoff_info.at(handoff_agent.id).insert({ 
 			Subtask_Entry{recipe, agents}, 
-			Subtask_Info{dummy.first_action, dummy.last_action, actions.size(), 
-				actions.at(0)} });
+			Subtask_Info{action_path.first_action, action_path.last_action, actions.size(), 
+				actions.at(0), path_ptr} });
 
 		Action_Path temp(actions, recipe, agents, main_agent);
-		handoff_paths.at(handoff_agent.id).insert(temp);
 	}
 	
 	const std::set<Action_Path>& get_normal() const { 
@@ -152,8 +157,8 @@ struct Paths {
 			return &(it->second);
 		}
 	}
-
-	std::vector<std::set<Action_Path>> handoff_paths;
+private:
+	std::vector<std::deque<Action_Path>> handoff_paths;
 	std::set<Action_Path> normal_paths;
 	std::vector<std::map<Subtask_Entry, Subtask_Info>> handoff_info;
 	std::vector<std::map<Subtask_Entry, Subtask_Info>> normal_info;
@@ -232,11 +237,11 @@ struct Agent_Usefulnes {
 	}
 
 	bool is_useful() const {
-		return ((int)excl_length - incl_length) / 2 > incl_last_action;
+		return ((float)excl_length - incl_length) / 2 > incl_last_action;
 	}
 
 	float get_usefulness() const {
-		return ((int)excl_length - incl_length) / 2;
+		return ((float)excl_length - incl_length) / 2;
 	}
 
 	std::string get_usefulness_str() const {
@@ -387,16 +392,24 @@ private:
 		const size_t& max_tasks, Colab_Collection collection,
 		std::vector<Collaboration_Info>::const_iterator it_in);
 
-	std::pair<size_t, Agent_Combination> get_best_permutation(const Agent_Combination& agents, const std::vector<Recipe>& recipes, const Paths& paths,
-		const std::vector<std::vector<Agent_Id>>& agent_permutations);
+	std::pair<size_t, Agent_Combination> get_best_permutation(const Agent_Combination& agents, 
+		const std::vector<Recipe>& recipes, const Paths& paths,
+		const std::vector<std::vector<Agent_Id>>& agent_permutations,
+		const State& state);
 
+	bool is_conflict_in_permutation(const Agent_Combination& best_permutation,
+		const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
+		const State& state);
 	Collaboration_Info get_action_from_permutation(const Agent_Combination& best_permutation,
 		const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
 		const size_t& best_length);
+	std::pair<size_t, const Subtask_Info*> get_actions_from_permutation_inner(
+		const Agent_Combination& best_permutation, const std::vector<Recipe>& recipes, 
+		const Paths& paths, const Agent_Combination& agents, const Agent_Id& acting_agent);
 
 	Recogniser recogniser;
 	Search search;
-	Agent_Id agent;
+	Agent_Id planning_agent;
 	Environment environment;
 	std::map<Agent_Combination, Reachables> agent_reachables;
 	std::map<Recipe_Agents, Solution_History> recipe_solutions;

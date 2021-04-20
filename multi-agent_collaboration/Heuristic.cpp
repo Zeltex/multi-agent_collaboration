@@ -68,10 +68,17 @@ std::pair<size_t, size_t> Heuristic::get_helper_agents_distance(Coordinate sourc
 				if (first && handoff_agent.has_value() && handoff_agent.value() == agent_id) {
 					continue;
 				}
-				const auto& agent_coord = state.agents.at(agent_id.id).coordinate;
+				const auto& agent_ref = state.agents.at(agent_id.id);
+				const auto& agent_coord = agent_ref.coordinate;
 				const auto& dist = dist_agent_ref.const_at(agent_coord, prev);
-				if (dist.g < min_dist) {
-					min_dist = dist.g;
+				size_t holding_penalty = 0;
+
+				if (dist.g != 0 && agent_ref.item.has_value()) {
+					holding_penalty = 1;
+				}
+
+				if (dist.g + holding_penalty < min_dist) {
+					min_dist = dist.g + holding_penalty;
 				}
 			}
 			first = false;
@@ -119,8 +126,30 @@ size_t Heuristic::get_nearest_agent_distance(const State& state, Coordinate loca
 	return min_dist + handoff_agent_penalty;
 }
 
+size_t Heuristic::get_non_participating_agent_holding_penalty(const Location& location1,
+	const Location& location2, const State& state, const Agent_Combination& local_agents) const {
+
+	size_t penalty = 0;
+	if (!location1.from_wall) {
+		auto agent = state.get_agent(location1.coordinate);
+		if (agent.has_value() && !local_agents.contains(agent.value())) {
+			++penalty;
+		}
+	}
+
+	if (!location2.from_wall) {
+		auto agent = state.get_agent(location2.coordinate);
+		if (agent.has_value() && !local_agents.contains(agent.value())) {
+			++penalty;
+		}
+	}
+	return penalty;
+}
+
 // Main heuristic calculation
-size_t Heuristic::get_heuristic_distance(const Location& location1, const Location& location2, const State& state, const std::optional<Agent_Id>& handoff_agent, const Agent_Combination& local_agents) const {
+size_t Heuristic::get_heuristic_distance(const Location& location1, const Location& location2, const State& state, 
+	const std::optional<Agent_Id>& handoff_agent, const Agent_Combination& local_agents) const {
+	
 	if (location1.original == location2.original) {
 		return get_nearest_agent_distance(state, location1.original, handoff_agent);
 	}
@@ -132,6 +161,8 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 		//+ (environment.is_type_stationary(ingredient1)
 		//	&& location1.coordinate != location2.coordinate ? 1 : 0);
 
+	size_t holding_penalty = get_non_participating_agent_holding_penalty(location1, location2, state, local_agents);
+
 
 	if (!environment.is_type_stationary(ingredient1)) {
 		auto [agent_dist, path_length] = get_helper_agents_distance(location1.coordinate, location2.coordinate, state, handoff_agent, local_agents);
@@ -141,7 +172,7 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 		} else {
 			agent_dist += get_nearest_agent_distance(state, location1.coordinate, {});
 		}
-		min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty);
+		min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty + holding_penalty);
 	}
 	auto [agent_dist, path_length] = get_helper_agents_distance(location2.coordinate, location1.coordinate, state, handoff_agent, local_agents);
 	if (agent_dist == EMPTY_VAL || path_length == EMPTY_VAL) return EMPTY_VAL;
@@ -150,7 +181,7 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 	} else {
 		agent_dist += get_nearest_agent_distance(state, location2.coordinate, {});
 	}
-	min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty);
+	min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty + holding_penalty);
 	return min_dist;
 }
 
