@@ -32,6 +32,8 @@ Planner::Planner(Environment environment, Agent_Id planning_agent, const State& 
 }
 
 Action Planner::get_next_action(const State& state) {
+	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, std::string("Time step: ") + std::to_string(time_step) + "\n");
+
 	initialize_reachables(state);
 	auto recipes = environment.get_possible_recipes(state);
 	if (recipes.empty()) {
@@ -81,7 +83,7 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 					auto info = paths.get_normal(planning_agent, entry);
 					if (info.has_value()) {
 						auto& info_val = info.value();
-						Collaboration_Info result = { info_val->length, info_val->last_action, agents, recipes, info_val->action(agents.get().at(0)) };
+						Collaboration_Info result = { info_val->length, info_val->last_action, agents, recipes, info_val->action(agents.get().at(0)), agents };
 						infos.push_back(result);
 					}
 				} else {
@@ -265,9 +267,9 @@ Collaboration_Info Planner::get_action_from_permutation(const Agent_Combination&
 	auto [last_action, info] = get_actions_from_permutation_inner(best_permutation, recipes, paths, agents, planning_agent);
 
 	if (info == nullptr) {
-		return Collaboration_Info{ best_length, last_action, agents, recipes, {Direction::NONE, planning_agent} };
+		return Collaboration_Info{ best_length, last_action, agents, recipes, {Direction::NONE, planning_agent}, best_permutation };
 	} else {
-		return Collaboration_Info{ best_length, last_action, agents, recipes, info->action(planning_agent) };
+		return Collaboration_Info{ best_length, last_action, agents, recipes, info->action(planning_agent), best_permutation };
 	}
 }
 
@@ -344,8 +346,22 @@ std::pair<size_t, const Subtask_Info*> Planner::get_actions_from_permutation_inn
 	
 	size_t recipes_size = recipes.size();
 
-	// TODO - Agent may have multiple tasks
-	auto agent_index = best_permutation.get_index(acting_agent);
+	// Agent may have multiple tasks
+	auto agent_indices = best_permutation.get_indices(acting_agent);
+	//auto agent_index = best_permutation.get_index(acting_agent);
+
+	size_t best_handoff = EMPTY_VAL;
+	size_t agent_index = EMPTY_VAL;
+	for (const auto& index : agent_indices) {
+		if (index < recipes_size) {
+			auto info = paths.get_handoff(acting_agent, Subtask_Entry{ recipes.at(index), agents });
+			if (info.value()->last_action < best_handoff) {
+				best_handoff = info.value()->last_action;
+				agent_index = index;
+			}
+		}
+
+	}
 
 	// If agent is responsible for handoff
 	if (agent_index < recipes_size) {
@@ -527,13 +543,19 @@ Colab_Collection Planner::get_best_collaboration_rec(const std::vector<Collabora
 			collection.add(*it);
 			
 			if (collection.tasks < max_tasks 
-				&& collection.agents.size() < max_agents
-				&& collection.is_compatible(it->recipes, available_ingredients, environment)) {
+				&& collection.agents.size() < max_agents) { 
 
-				collection = get_best_collaboration_rec(infos, max_tasks, max_agents, 
-					collection, it, available_ingredients);
+				if (collection.is_compatible(it->recipes, available_ingredients, environment)) {
 
-				if (!collection.has_value()) {
+					collection = get_best_collaboration_rec(infos, max_tasks, max_agents,
+						collection, it, available_ingredients);
+
+					if (!collection.has_value()) {
+						continue;
+					}
+
+
+				} else {
 					continue;
 				}
 			} else {
@@ -654,7 +676,7 @@ Paths Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& st
 				trim.trim(trim_path, state, environment, recipe);
 
 
-				paths.insert(trim_path, recipe, agents, planning_agent);
+				paths.insert(trim_path, recipe, agents, planning_agent, state, environment);
 			}
 
 			std::string debug_string = "(";
@@ -671,7 +693,8 @@ Paths Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& st
 					time_end = std::chrono::system_clock::now();
 					diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 
-						Action_Path a_path{ path, recipe, agents, planning_agent };
+						Coordinate agent_coordinate = state.get_agent(planning_agent).coordinate;
+						Action_Path a_path{ path, recipe, agents, planning_agent, agent_coordinate, environment };
 
 
 						std::stringstream buffer;
@@ -685,7 +708,7 @@ Paths Planner::get_all_paths(const std::vector<Recipe>& recipes, const State& st
 						PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
 
 					if (!path.empty()) {
-						paths.insert(path, recipe, agents, planning_agent, handoff_agent);
+						paths.insert(path, recipe, agents, planning_agent, handoff_agent, state, environment);
 					}
 				}
 			}

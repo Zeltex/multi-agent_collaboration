@@ -13,6 +13,7 @@ struct State {
 	void						add_goal_item(Coordinate coordinate, Ingredient ingredient);
 	bool						contains_item(Ingredient ingredient) const;
 	std::optional<Agent_Id>		get_agent(Coordinate coordinate) const;
+	Agent						get_agent(Agent_Id agent) const;
 	std::vector<Coordinate>		get_coordinates(Ingredient ingredient) const;
 	size_t						get_count(Ingredient ingredient) const;
 	std::optional<Ingredient>	get_ingredient_at_position(Coordinate coordinate) const;

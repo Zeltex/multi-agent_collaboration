@@ -34,6 +34,11 @@ bool Environment::is_cell_type(const Coordinate& coordinate, const Cell_Type& ty
 	exit(-1);
 	return false;
 }
+
+bool Environment::is_cell_type(const Coordinate& coordinate, const Direction& direction, const Cell_Type& type) const {
+	return is_cell_type(move_noclip(coordinate, direction), type);
+}
+
 bool Environment::is_type_stationary(Ingredient ingredient) const {
 	switch (ingredient) {
 	case Ingredient::CUTTING: return true;

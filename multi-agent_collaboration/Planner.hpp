@@ -15,7 +15,9 @@ struct Action_Path {
 	Action_Path(std::vector<Joint_Action> joint_actions,
 		Recipe recipe,
 		Agent_Combination agents,
-		Agent_Id main_agent)
+		Agent_Id main_agent,
+		const Coordinate& initial_coordinate,
+		const Environment& environment)
 		: joint_actions(joint_actions), recipe(recipe), agents(agents),
 		first_action(EMPTY_VAL), last_action(EMPTY_VAL) {
 
@@ -24,7 +26,12 @@ struct Action_Path {
 		}
 		
 		first_action = 0;
-		while (!joint_actions.at(first_action).is_action_useful(main_agent)) {
+		auto coordinate = initial_coordinate;
+		while (true) {
+			coordinate = environment.move(coordinate, joint_actions.at(first_action).get_action(main_agent).direction);
+			if (environment.is_cell_type(coordinate, Cell_Type::WALL)) {
+				break;
+			}
 			if (first_action == joint_actions.size() - 1) {
 				first_action = EMPTY_VAL;
 				break;
@@ -32,8 +39,13 @@ struct Action_Path {
 			++first_action;
 		}
 
+		coordinate = initial_coordinate;
 		last_action = joint_actions.size() - 1;
-		while (!joint_actions.at(last_action).is_action_useful(main_agent)) {
+		while (true) {
+			coordinate = environment.move(coordinate, joint_actions.at(last_action).get_action(main_agent).direction);
+			if (environment.is_cell_type(coordinate, Cell_Type::WALL)) {
+				break;
+			}
 			if (last_action == 0) {
 				last_action = EMPTY_VAL;
 				break;
@@ -118,8 +130,13 @@ struct Paths {
 		handoff_paths(number_of_agents){};
 
 	void insert(const std::vector<Joint_Action>& actions, Recipe recipe,
-		Agent_Combination agents, Agent_Id main_agent) {
-		Action_Path temp(actions, recipe, agents, main_agent);
+		Agent_Combination agents, Agent_Id main_agent,
+		const State& state, const Environment& environment) {
+
+		Coordinate agent_coordinate = state.get_agent(main_agent).coordinate;
+
+		Action_Path temp(actions, recipe, agents, main_agent,
+			agent_coordinate, environment);
 		for (size_t i = 0; i < normal_info.size(); ++i) {
 			normal_info.at(i).insert({
 				Subtask_Entry{recipe, agents},
@@ -130,9 +147,14 @@ struct Paths {
 	}
 	
 	void insert(const std::vector<Joint_Action>& actions, Recipe recipe,
-		Agent_Combination agents, Agent_Id main_agent, Agent_Id handoff_agent) {
+		Agent_Combination agents, Agent_Id main_agent, Agent_Id handoff_agent,
+		const State& state, const Environment& environment) {
+
+		Coordinate agent_coordinate = state.get_agent(main_agent).coordinate;
+
 		// TODO - A little inefficient to create an Action_Path just to get last_action
-		Action_Path action_path(actions, recipe, agents, handoff_agent);
+		Action_Path action_path(actions, recipe, agents, handoff_agent, 
+			agent_coordinate, environment);
 		handoff_paths.at(handoff_agent.id).push_back(action_path);
 		Action_Path* path_ptr = &handoff_paths.at(handoff_agent.id).back();
 
@@ -141,7 +163,6 @@ struct Paths {
 			Subtask_Info{action_path.first_action, action_path.last_action, actions.size(), 
 				actions.at(0), path_ptr} });
 
-		Action_Path temp(actions, recipe, agents, main_agent);
 	}
 	
 	const std::set<Action_Path>& get_normal() const { 
@@ -174,19 +195,20 @@ private:
 
 struct Collaboration_Info {
 	Collaboration_Info() : length(EMPTY_VAL), last_action(EMPTY_VAL), combination(), recipes(), 
-		next_action(), value(EMPTY_VAL) {};
+		next_action(), value(EMPTY_VAL), permutation() {};
 
 	Collaboration_Info(size_t length, size_t last_action, Agent_Combination combination, const std::vector<Recipe> recipes,
-		Action next_action)
+		Action next_action, Agent_Combination permutation)
 		: length(length), last_action(last_action), combination(combination), recipes(recipes), 
-			next_action(next_action), value(EMPTY_VAL) {};
+			next_action(next_action), value(EMPTY_VAL), permutation(permutation){};
 
 	std::string to_string() const {
 		std::string result;
 		for (const auto& recipe : recipes) {
 			result += recipe.result_char();
 		}
-		result += combination.to_string();
+		result += combination.to_string() + ":" + permutation.to_string();
+		
 		return result;
 	}
 
@@ -197,6 +219,7 @@ struct Collaboration_Info {
 	size_t length;
 	size_t last_action;
 	Agent_Combination combination;
+	Agent_Combination permutation;
 	std::vector<Recipe> recipes;
 	Action next_action;
 
@@ -363,7 +386,8 @@ struct Colab_Collection {
 		std::vector<float> values(max_agents, 0);
 		for (const auto& info : infos) {
 			for (const auto& agent : info.combination.get()) {
-				values.at(agent.id) += info.value * info.recipes.size();
+				//values.at(agent.id) += info.value * info.recipes.size();
+				values.at(agent.id) += info.value;
 			}
 		}
 		value = 0;

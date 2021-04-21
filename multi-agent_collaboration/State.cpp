@@ -26,6 +26,11 @@ std::optional<Agent_Id> State::get_agent(Coordinate coordinate) const {
 	return {};
 }
 
+Agent State::get_agent(Agent_Id agent) const {
+	assert(agent.id < agents.size());
+	return agents.at(agent.id);
+}
+
 size_t State::get_count(Ingredient ingredient) const {
 	size_t count = 0;
 	for (const auto& [coord, ingredient_entry] : items) {

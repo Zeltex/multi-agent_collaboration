@@ -265,6 +265,17 @@ struct Agent_Combination {
 		}
 		return EMPTY_VAL;
 	}
+
+	std::vector<size_t> get_indices(Agent_Id agent) const {
+		std::vector<size_t> result;
+		size_t counter = 0;
+		for (const auto& entry : agents) {
+			if (entry == agent) result.push_back(counter);
+			++counter;
+		}
+		return result;
+	}
+
 	Agent_Id get(size_t index) const {
 		assert(index < agents.size());
 		return agents.at(index);
@@ -326,6 +337,7 @@ public:
 
 	bool is_inbound(const Coordinate& coordiante) const;
 	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
+	bool is_cell_type(const Coordinate& coordinate, const Direction& direction, const Cell_Type& type) const;
 	bool is_type_stationary(Ingredient ingredient) const;
 	bool is_done(const State& state) const;
 	bool act(State& state, const Action& action) const;
@@ -333,6 +345,8 @@ public:
 	bool act(State& state, const Joint_Action& action) const;
 	bool act(State& state, const Joint_Action& action, Print_Level print_level) const;
 	State load(const std::string& path);
+	Coordinate move(const Coordinate& coordinate, Direction direction) const;
+	Coordinate move_noclip(const Coordinate& coordinate, Direction direction) const;
 	void print_state() const;
 	void print_state(const State& state) const;
 	void play(State& state) const;
@@ -360,8 +374,6 @@ private:
 	std::optional<Ingredient> get_recipe(Ingredient ingredient1, Ingredient ingredient2) const;
 	const std::map<std::pair<Ingredient, Ingredient>, Ingredient>& get_recipes() const;
 	void check_collisions(const State& state, Joint_Action& joint_action) const;
-	Coordinate move(const Coordinate& coordinate, Direction direction) const;
-	Coordinate move_noclip(const Coordinate& coordinate, Direction direction) const;
 	void reset();
 	void calculate_recipes();
 
