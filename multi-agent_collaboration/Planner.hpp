@@ -372,6 +372,31 @@ struct Colab_Collection {
 		}
 	}
 
+	bool is_compatible(const std::vector<Recipe>& recipes_in, 
+		const std::map<Ingredient, size_t>& available_ingredients,
+		const Environment& environment) const {
+		
+		std::map<Ingredient, size_t> recipe_ingredients;
+		Recipes recipes;
+
+		for (const auto& info : infos) {
+			recipes.get_ingredient_counts(recipe_ingredients, info.recipes);
+		}
+		recipes.get_ingredient_counts(recipe_ingredients, recipes_in);
+
+		for (const auto& [ingredient, count] : recipe_ingredients) {
+			if (environment.is_type_stationary(ingredient)) continue;
+
+			auto it = available_ingredients.find(ingredient);
+			if (it == available_ingredients.end()){ 
+				if (count > 0) return false;
+			} else {
+				if (count > it->second) return false;
+			}
+		}
+		return true;
+	}
+
 	std::vector<Collaboration_Info> infos;
 	size_t tasks;
 	std::set<Agent_Id> agents;
@@ -399,10 +424,11 @@ private:
 	void update_recogniser(const Paths& paths);
 
 	Collaboration_Info get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
-		const size_t& max_tasks);
+		const size_t& max_tasks, const State& state);
 	Colab_Collection get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
 		const size_t& max_tasks, const size_t& max_agents, Colab_Collection collection,
-		std::vector<Collaboration_Info>::const_iterator it_in);
+		std::vector<Collaboration_Info>::const_iterator it_in,
+		const std::map<Ingredient, size_t>& available_ingredients);
 
 	std::pair<size_t, Agent_Combination> get_best_permutation(const Agent_Combination& agents, 
 		const std::vector<Recipe>& recipes, const Paths& paths,

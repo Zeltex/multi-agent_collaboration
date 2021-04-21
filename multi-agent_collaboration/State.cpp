@@ -52,6 +52,29 @@ std::optional<Ingredient> State::get_ingredient_at_position(Coordinate coordinat
 	}
 }
 
+std::map<Ingredient, size_t> State::get_ingredients_count() const {
+	std::map<Ingredient, size_t> result;
+	for (const auto& [coord, ingredient] : items) {
+		auto it = result.find(ingredient);
+		if (it == result.end()) {
+			result.insert({ ingredient, 1 });
+		} else {
+			++(it->second);
+		}
+	}
+	for (const auto& agent : agents) {
+		if (agent.item.has_value()) {
+			auto it = result.find(agent.item.value());
+			if (it == result.end()) {
+				result.insert({ agent.item.value(), 1 });
+			} else {
+				++(it->second);
+			}
+		}
+	}
+	return result;
+}
+
 bool State::items_hoarded(const Recipe& recipe, const Agent_Combination& available_agents) const {
 	std::vector<Ingredient> items_needed{ recipe.ingredient1, recipe.ingredient2 };
 	for (const auto& item : items) {

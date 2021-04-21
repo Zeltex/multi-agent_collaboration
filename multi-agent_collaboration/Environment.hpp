@@ -89,6 +89,46 @@ struct Recipe {
 	}
 };
 
+struct Recipes {
+	std::vector<Recipe> recipes;
+
+	std::map<Ingredient, size_t> get_ingredient_counts() const {
+		std::map<Ingredient, size_t> ingredients;
+		get_ingredient_counts(ingredients, recipes);
+		return ingredients;
+	}
+	
+	void get_ingredient_counts(std::map<Ingredient, size_t>& ingredients, const std::vector<Recipe>& recipes) const {
+		for (const auto& recipe : recipes) {
+			// Ingredient 1
+			auto it = ingredients.find(recipe.ingredient1);
+			if (it == ingredients.end()) {
+				ingredients.insert({ recipe.ingredient1, 1 });
+			} else {
+				++(it->second);
+			}
+
+			// Ingredient 2
+			it = ingredients.find(recipe.ingredient2);
+			if (it == ingredients.end()) {
+				ingredients.insert({ recipe.ingredient2, 1 });
+			} else {
+				++(it->second);
+			}
+		}
+
+		//for (const auto& [ingredient, count] : ingredients) {
+		//	if (!environment.is_type_stationary(ingredient)
+		//		&& state.get_count(ingredient) < count) {
+
+		//		is_probable = false;
+		//		break;
+		//	}
+		//}
+	}
+
+};
+
 struct Action {
 	Action() : direction(Direction::NONE), agent(EMPTY_VAL) {};
 	Action(Direction direction, Agent_Id agent) : direction(direction), agent(agent) {};

@@ -36,11 +36,11 @@ void Heuristic::set(Ingredient ingredient1, Ingredient ingredient2, const Agent_
 }
 
 // Returns the optimal path length, and total distance agents must move to assist in across-wall transfers
-std::pair<size_t, size_t> Heuristic::get_helper_agents_distance(Coordinate source, Coordinate destination, 
+std::tuple<size_t, size_t, bool> Heuristic::get_helper_agents_distance(Coordinate source, Coordinate destination, 
 	const State& state, const std::optional<Agent_Id> handoff_agent, const Agent_Combination& local_agents) const {
 	
 	if (source == destination) {
-		return { 0, 0 };
+		return { 0, 0, false};
 	}
 
 	auto agent_index = local_agents.size() - 1;
@@ -50,17 +50,19 @@ std::pair<size_t, size_t> Heuristic::get_helper_agents_distance(Coordinate sourc
 	size_t total_agent_dist = 0;
 	size_t path_length = 1;
 	bool first = true;
+	bool was_handed_off = false;
 	while (true) {
 		auto& prev_dist = dist_ref.const_at(source, prev);
 		if (prev_dist.parent == source) break;
 		if (prev_dist.parent == Coordinate{EMPTY_VAL, EMPTY_VAL}) {
-			return { EMPTY_VAL, EMPTY_VAL };
+			return { EMPTY_VAL, EMPTY_VAL, false };
 		}
 
 		auto next = prev_dist.parent;
 
 		++path_length;
 		if (environment.is_cell_type(next, Cell_Type::WALL)) {
+			was_handed_off = true;
 			size_t min_dist = EMPTY_VAL;
 			for (const auto& agent_id : agents.get()) {
 
@@ -87,7 +89,7 @@ std::pair<size_t, size_t> Heuristic::get_helper_agents_distance(Coordinate sourc
 		prev = next;
 	}
 	assert((distances.at(agent_index).const_at(source, destination).g == path_length));
-	return { total_agent_dist, path_length };
+	return { total_agent_dist, path_length, was_handed_off };
 }
 
 // Simply distance to nearest (non-handoff)agent
@@ -165,23 +167,25 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 
 
 	if (!environment.is_type_stationary(ingredient1)) {
-		auto [agent_dist, path_length] = get_helper_agents_distance(location1.coordinate, location2.coordinate, state, handoff_agent, local_agents);
-		if (agent_dist == EMPTY_VAL || path_length == EMPTY_VAL) return EMPTY_VAL;
-		if (agent_dist == 0) {
-			agent_dist += get_nearest_agent_distance(state, location1.coordinate, handoff_agent);
+		auto [agent_dist, path_length, was_handed_off] = get_helper_agents_distance(location1.coordinate, location2.coordinate, state, handoff_agent, local_agents);
+		if (agent_dist != EMPTY_VAL && path_length != EMPTY_VAL) {
+			if (!was_handed_off) {
+				agent_dist += get_nearest_agent_distance(state, location1.coordinate, handoff_agent);
+			} else {
+				agent_dist += get_nearest_agent_distance(state, location1.coordinate, {});
+			}
+			min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty + holding_penalty);
+		}
+	}
+	auto [agent_dist, path_length, was_handed_off] = get_helper_agents_distance(location2.coordinate, location1.coordinate, state, handoff_agent, local_agents);
+	if (agent_dist != EMPTY_VAL && path_length != EMPTY_VAL) {
+		if (!was_handed_off) {
+			agent_dist += get_nearest_agent_distance(state, location2.coordinate, handoff_agent);
 		} else {
-			agent_dist += get_nearest_agent_distance(state, location1.coordinate, {});
+			agent_dist += get_nearest_agent_distance(state, location2.coordinate, {});
 		}
 		min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty + holding_penalty);
 	}
-	auto [agent_dist, path_length] = get_helper_agents_distance(location2.coordinate, location1.coordinate, state, handoff_agent, local_agents);
-	if (agent_dist == EMPTY_VAL || path_length == EMPTY_VAL) return EMPTY_VAL;
-	if (agent_dist == 0) {
-		agent_dist += get_nearest_agent_distance(state, location2.coordinate, handoff_agent);
-	} else {
-		agent_dist += get_nearest_agent_distance(state, location2.coordinate, {});
-	}
-	min_dist = std::min(min_dist, agent_dist + path_length + wall_penalty + holding_penalty);
 	return min_dist;
 }
 

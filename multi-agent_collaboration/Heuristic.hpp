@@ -39,7 +39,7 @@ public:
 		const std::optional<Agent_Id>& handoff_agent);
 
 private:
-	std::pair<size_t, size_t> get_helper_agents_distance(Coordinate source, Coordinate destination, const State& state, 
+	std::tuple<size_t, size_t, bool>  get_helper_agents_distance(Coordinate source, Coordinate destination, const State& state,
 		const std::optional<Agent_Id> handoff_agent, const Agent_Combination& local_agents) const;
 	
 	size_t get_heuristic_distance(const Location& location1, const Location& location2, const State& state, 

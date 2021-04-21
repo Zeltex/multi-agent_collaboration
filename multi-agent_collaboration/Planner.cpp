@@ -157,8 +157,7 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 				}
 			}
 
-			// TODO - If recipes in combination are mutually exclusive, then not probable
-
+			// If recipes in combination are mutually exclusive, then not probable
 			std::map<Ingredient, size_t> ingredients;
 			for (const auto& recipe : info_entry.recipes) {
 				// Ingredient 1
@@ -213,7 +212,7 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer1.str() + '\n');
 	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer2.str() + "\n\n");
 
-	auto info = get_best_collaboration(probable_infos, max_tasks);
+	auto info = get_best_collaboration(probable_infos, max_tasks, state);
 
 
 	std::stringstream buffer3;
@@ -496,12 +495,13 @@ std::pair<size_t, Agent_Combination> Planner::get_best_permutation(const Agent_C
 }
 
 Collaboration_Info Planner::get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
-	const size_t& max_tasks) {
+	const size_t& max_tasks, const State& state) {
 
 	size_t max_agents = environment.get_number_of_agents();
 
 	// TODO - Should sort of infos which are not probable
-	auto collection = get_best_collaboration_rec(infos, max_tasks, max_agents, Colab_Collection{}, infos.begin());
+	auto collection = get_best_collaboration_rec(infos, max_tasks, max_agents, Colab_Collection{}, 
+		infos.begin(), state.get_ingredients_count());
 	Collaboration_Info best_info;
 	for (const auto& info : collection.infos) {
 		if (info.combination.contains(planning_agent) && info.value < best_info.value) {
@@ -513,7 +513,8 @@ Collaboration_Info Planner::get_best_collaboration(const std::vector<Collaborati
 
 Colab_Collection Planner::get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
 	const size_t& max_tasks, const size_t& max_agents, Colab_Collection collection_in,
-	std::vector<Collaboration_Info>::const_iterator it_in) {
+	std::vector<Collaboration_Info>::const_iterator it_in,
+	const std::map<Ingredient, size_t>& available_ingredients) {
 
 	Colab_Collection best_collection;
 
@@ -525,8 +526,13 @@ Colab_Collection Planner::get_best_collaboration_rec(const std::vector<Collabora
 			auto collection = collection_in;
 			collection.add(*it);
 			
-			if (collection.tasks < max_tasks && collection.agents.size() < max_agents) {
-				collection = get_best_collaboration_rec(infos, max_tasks, max_agents, collection, it);
+			if (collection.tasks < max_tasks 
+				&& collection.agents.size() < max_agents
+				&& collection.is_compatible(it->recipes, available_ingredients, environment)) {
+
+				collection = get_best_collaboration_rec(infos, max_tasks, max_agents, 
+					collection, it, available_ingredients);
+
 				if (!collection.has_value()) {
 					continue;
 				}
