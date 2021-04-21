@@ -405,10 +405,10 @@ std::pair<size_t, Agent_Combination> Planner::get_best_permutation(const Agent_C
 	Agent_Combination best_permutation;
 	size_t best_length = HIGH_INIT_VAL;
 	size_t agent_size = agents.size();
-	bool is_valid_permutation = true;
 
 	// Get value for this setup
 	for (const auto& agent_permutation : agent_permutations) {
+		bool is_valid_permutation = true;
 
 		size_t length = 0;
 
