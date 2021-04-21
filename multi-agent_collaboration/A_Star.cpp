@@ -129,7 +129,11 @@ void A_Star::print_current(const Node* node) const {
 std::pair<bool, Node*> A_Star::check_and_perform(const Joint_Action& action, Node_Ref& nodes, const Node* current_node, const std::optional<Agent_Id>& handoff_agent) const {
 	
 	// Useful action from handoff agent after handoff
-	if (current_node->has_agent_passed() && handoff_agent.has_value() && action.is_action_useful(handoff_agent.value())) {
+	if (current_node->has_agent_passed() 
+		&& action.is_action_valid()
+		&& handoff_agent.has_value() 
+		&& action.is_action_useful(handoff_agent.value())) {
+
 		return { false, nullptr };
 	}
 	nodes.emplace_back(current_node, nodes.size());

@@ -93,6 +93,14 @@ struct Subtask_Info {
 	Action action(const Agent_Id& agent) const {
 		return next_action.get_action(agent);
 	}
+	bool has_useful_action(const Agent_Id& agent) const {
+		for (const auto& action : actions->joint_actions) {
+			if (action.is_action_useful(agent)) {
+				return true;
+			}
+		}
+		return false;
+	}
 };
 struct Subtask_Entry {
 	Recipe recipe;
@@ -307,6 +315,9 @@ struct Colab_Collection {
 	void add(const Collaboration_Info& info) {
 		tasks += info.recipes.size();
 		infos.push_back(info);
+		for (const auto& agent : info.combination.get()) {
+			agents.insert(agent);
+		}
 	}
 
 	bool has_value() const {
@@ -363,6 +374,7 @@ struct Colab_Collection {
 
 	std::vector<Collaboration_Info> infos;
 	size_t tasks;
+	std::set<Agent_Id> agents;
 	float value;
 };
 
@@ -389,7 +401,7 @@ private:
 	Collaboration_Info get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
 		const size_t& max_tasks);
 	Colab_Collection get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
-		const size_t& max_tasks, Colab_Collection collection,
+		const size_t& max_tasks, const size_t& max_agents, Colab_Collection collection,
 		std::vector<Collaboration_Info>::const_iterator it_in);
 
 	std::pair<size_t, Agent_Combination> get_best_permutation(const Agent_Combination& agents, 

@@ -32,6 +32,7 @@ Planner::Planner(Environment environment, Agent_Id planning_agent, const State& 
 }
 
 Action Planner::get_next_action(const State& state) {
+	initialize_reachables(state);
 	auto recipes = environment.get_possible_recipes(state);
 	if (recipes.empty()) {
 		return { Direction::NONE, { planning_agent } };
@@ -114,7 +115,7 @@ std::optional<Collaboration_Info> Planner::check_for_collaboration(const Paths& 
 		//	}
 		//}
 
-		auto penalty = std::pow(GAMMA, entry.combination.size() + entry.recipes.size() - 2);
+		auto penalty = std::pow(GAMMA, entry.combination.size() - entry.recipes.size());
 		entry.value = (penalty * entry.length) / entry.recipes.size();
 		goal_values.insert({ Multi_Goal{entry.combination, entry.recipes}, entry.value });
 	}
@@ -350,10 +351,10 @@ std::pair<size_t, const Subtask_Info*> Planner::get_actions_from_permutation_inn
 	// If agent is responsible for handoff
 	if (agent_index < recipes_size) {
 		auto info = paths.get_handoff(acting_agent, Subtask_Entry{ recipes.at(agent_index), agents });
-		Action action = info.value()->action(acting_agent);
+		//Action action = info.value()->action(acting_agent);
 
 		// TODO - Should use some special 'useless' value isntead of none
-		if (action.is_not_none()) {
+		if (info.value()->has_useful_action(acting_agent)) {
 			return { info.value()->last_action, info.value() };
 		}
 	}
@@ -364,9 +365,10 @@ std::pair<size_t, const Subtask_Info*> Planner::get_actions_from_permutation_inn
 	const Subtask_Info* best_info = nullptr;
 	for (size_t i = 0; i < recipes_size; ++i) {
 		auto info = paths.get_handoff(best_permutation.get(i), Subtask_Entry{ recipes.at(i), agents });
-		Goal goal{ Agent_Combination{acting_agent}, recipes.at(i) };
+		Goal goal{agents, recipes.at(i) };
 		if (info.has_value()
-			&& info.value()->action(acting_agent).is_not_none()
+			//&& info.value()->action(acting_agent).is_not_none()
+			&& info.value()->has_useful_action(acting_agent)
 			&& recogniser.get_probability(goal) > highest_prob) {
 
 			best_info = info.value();
@@ -496,8 +498,10 @@ std::pair<size_t, Agent_Combination> Planner::get_best_permutation(const Agent_C
 Collaboration_Info Planner::get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
 	const size_t& max_tasks) {
 
+	size_t max_agents = environment.get_number_of_agents();
+
 	// TODO - Should sort of infos which are not probable
-	auto collection = get_best_collaboration_rec(infos, max_tasks, Colab_Collection{}, infos.begin());
+	auto collection = get_best_collaboration_rec(infos, max_tasks, max_agents, Colab_Collection{}, infos.begin());
 	Collaboration_Info best_info;
 	for (const auto& info : collection.infos) {
 		if (info.combination.contains(planning_agent) && info.value < best_info.value) {
@@ -508,7 +512,7 @@ Collaboration_Info Planner::get_best_collaboration(const std::vector<Collaborati
 }
 
 Colab_Collection Planner::get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
-	const size_t& max_tasks, Colab_Collection collection_in, 
+	const size_t& max_tasks, const size_t& max_agents, Colab_Collection collection_in,
 	std::vector<Collaboration_Info>::const_iterator it_in) {
 
 	Colab_Collection best_collection;
@@ -521,8 +525,8 @@ Colab_Collection Planner::get_best_collaboration_rec(const std::vector<Collabora
 			auto collection = collection_in;
 			collection.add(*it);
 			
-			if (collection.tasks < max_tasks) {
-				collection = get_best_collaboration_rec(infos, max_tasks, collection, it);
+			if (collection.tasks < max_tasks && collection.agents.size() < max_agents) {
+				collection = get_best_collaboration_rec(infos, max_tasks, max_agents, collection, it);
 				if (!collection.has_value()) {
 					continue;
 				}
@@ -714,15 +718,16 @@ bool Planner::ingredients_reachable(const Recipe& recipe, const Agent_Combinatio
 }
 
 
-void Planner::initialize_reachables(const State& initial_state) {
-	auto combinations = get_combinations(initial_state.agents.size());
+void Planner::initialize_reachables(const State& state) {
+	agent_reachables.clear();
+	auto combinations = get_combinations(state.agents.size());
 	for (const auto& agents : combinations) {
 		Reachables reachables(environment.get_width(), environment.get_height());
 
 		// Initial agent locations
 		std::deque<Coordinate> frontier;
 		for (const auto& agent : agents.get()) {
-			auto location = initial_state.get_location(agent);
+			auto location = state.get_location(agent);
 			reachables.set(location, true);
 			frontier.push_back(location);
 		}
@@ -735,7 +740,11 @@ void Planner::initialize_reachables(const State& initial_state) {
 			for (const auto& location : environment.get_neighbours(next)) {
 				if (!reachables.get(location)) {
 					reachables.set(location, true);
-					if (!environment.is_cell_type(location, Cell_Type::WALL)) {
+					auto blocking_agent = state.get_agent(location);
+
+					if (!environment.is_cell_type(location, Cell_Type::WALL)
+						&& (!blocking_agent.has_value() 
+							|| agents.contains(blocking_agent.value()))) {
 						frontier.push_back(location);
 					}
 				}

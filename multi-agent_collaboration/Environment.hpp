@@ -125,7 +125,7 @@ struct Joint_Action {
 	}
 
 	bool is_action_useful(Agent_Id agent) const {
-		if (actions.size() <= agent.id)  return false;
+		assert(actions.size() > agent.id);
 		return actions.at(agent.id).direction != Direction::NONE;
 	}
 

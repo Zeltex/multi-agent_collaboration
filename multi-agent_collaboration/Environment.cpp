@@ -75,7 +75,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 	// Simple move
 	if (!is_cell_type(new_position, Cell_Type::WALL)) {
 		state.agents.at(action.agent.id).move_to(new_position);
-		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Moved ") + static_cast<char>(action.direction));
+		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Moved ") + static_cast<char>(action.direction) + "\n");
 		return true;
 
 	// Goal condition
@@ -85,7 +85,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 			if (recipe.has_value()) {
 				agent.clear_item();
 				state.add_goal_item(new_position, recipe.value());
-				PRINT(Print_Category::ENVIRONMENT, print_level, std::string("goal ingredient delivered ") + static_cast<char>(recipe.value()));
+				PRINT(Print_Category::ENVIRONMENT, print_level, std::string("goal ingredient delivered ") + static_cast<char>(recipe.value()) + "\n");
 				return true;
 			}
 		}
@@ -97,7 +97,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 			state.remove(new_position);
 			agent.clear_item();
 			agent.set_item(recipe.value());
-			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Combine ") + static_cast<char>(recipe.value()));
+			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Combine ") + static_cast<char>(recipe.value()) + "\n");
 			return true;
 		} else {
 			auto recipe_reverse = get_recipe(item_new_position.value(), item_old_position.value());
@@ -105,7 +105,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 				state.remove(new_position);
 				agent.clear_item();
 				agent.set_item(recipe_reverse.value());
-				PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Combine ") + static_cast<char>(recipe_reverse.value()));
+				PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Combine ") + static_cast<char>(recipe_reverse.value()) + "\n");
 				return true;
 			}
 		}
@@ -116,12 +116,12 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 		if (recipe.has_value()) {
 			agent.clear_item();
 			agent.set_item(recipe.value());
-			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("chop chop ") + static_cast<char>(recipe.value()));
+			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("chop chop ") + static_cast<char>(recipe.value()) + "\n");
 			return true;
 		} else {
 			agent.clear_item();
 			state.add(new_position, item_old_position.value());
-			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("pickup"));
+			PRINT(Print_Category::ENVIRONMENT, print_level, std::string("pickup") + "\n");
 			return true;
 		}
 
@@ -130,18 +130,18 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 	} else if (item_old_position.has_value()) {
 		agent.clear_item();
 		state.add(new_position, item_old_position.value());
-		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("place ") + static_cast<char>(item_old_position.value()));
+		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("place ") + static_cast<char>(item_old_position.value()) + "\n");
 		return true;
 
 	// Pickup
 	} else if (item_new_position.has_value()) {
 		state.remove(new_position);
 		agent.set_item(item_new_position.value());
-		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("pickup ") + static_cast<char>(item_new_position.value()));
+		PRINT(Print_Category::ENVIRONMENT, print_level, std::string("pickup ") + static_cast<char>(item_new_position.value()) + "\n");
 		return true;
 	}
 	// They simply decided to hump a wall
-	PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Nothing happened"));
+	PRINT(Print_Category::ENVIRONMENT, print_level, std::string("Nothing happened") + "\n");
 	return false;
 }
 
