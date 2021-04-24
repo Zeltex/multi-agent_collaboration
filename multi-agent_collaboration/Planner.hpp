@@ -25,10 +25,11 @@ struct Action_Path {
 			return;
 		}
 		
+		// Stop at first action which interacts with a wall
 		first_action = 0;
 		auto coordinate = initial_coordinate;
 		while (true) {
-			coordinate = environment.move(coordinate, joint_actions.at(first_action).get_action(main_agent).direction);
+			coordinate = environment.move_noclip(coordinate, joint_actions.at(first_action).get_action(main_agent).direction);
 			if (environment.is_cell_type(coordinate, Cell_Type::WALL)) {
 				break;
 			}
@@ -39,18 +40,19 @@ struct Action_Path {
 			++first_action;
 		}
 
+		// Note last action which interacts with a wall 
+		// (note wall check is using noclip, but coordinate tracking is using regular move)
 		coordinate = initial_coordinate;
-		last_action = joint_actions.size() - 1;
-		while (true) {
-			coordinate = environment.move(coordinate, joint_actions.at(last_action).get_action(main_agent).direction);
-			if (environment.is_cell_type(coordinate, Cell_Type::WALL)) {
-				break;
+		last_action = EMPTY_VAL;
+		size_t action_counter = 0;
+		while (action_counter < joint_actions.size()) {
+			const auto& direction = joint_actions.at(action_counter).get_action(main_agent).direction;
+			if (environment.is_cell_type(environment.move_noclip(coordinate, direction), Cell_Type::WALL)) {
+				last_action = action_counter;
 			}
-			if (last_action == 0) {
-				last_action = EMPTY_VAL;
-				break;
-			}
-			--last_action;
+
+			coordinate = environment.move(coordinate, direction);
+			++action_counter;
 		}
 	}
 
@@ -71,6 +73,31 @@ struct Action_Path {
 
 	bool contains_useful_action() const {
 		return last_action != EMPTY_VAL;
+	}
+
+	bool has_useful_action(const Agent_Id& agent, const State& state, const Environment& environment) const {
+
+		auto coordinate = state.get_agent(agent).coordinate;
+		size_t action_counter = 0;
+		while (action_counter < joint_actions.size()) {
+			coordinate = environment.move_noclip(coordinate, joint_actions.at(action_counter).get_action(agent).direction);
+			if (environment.is_cell_type(coordinate, Cell_Type::WALL)) {
+				return true;
+			}
+			++action_counter;
+		}
+		return false;
+	}
+
+	size_t get_first_non_trivial_index(Agent_Id agent) const {
+		size_t index = 0;
+		for (const auto& action : joint_actions) {
+			if (action.is_action_non_trivial(agent)) {
+				return index;
+			}
+			++index;
+		}
+		return EMPTY_VAL;
 	}
 
 	Action get_next_action(Agent_Id agent) const {
@@ -107,7 +134,7 @@ struct Subtask_Info {
 	}
 	bool has_useful_action(const Agent_Id& agent) const {
 		for (const auto& action : actions->joint_actions) {
-			if (action.is_action_useful(agent)) {
+			if (action.is_action_non_trivial(agent)) {
 				return true;
 			}
 		}
@@ -164,6 +191,31 @@ struct Paths {
 				actions.at(0), path_ptr} });
 
 	}
+
+	void update(const std::vector<Joint_Action>& actions, Recipe recipe,
+		Agent_Combination agents, Agent_Id main_agent, Agent_Id handoff_agent,
+		const State& state, const Environment& environment) {
+
+		// Erase info
+		auto& handoff_ref = handoff_info.at(handoff_agent.id);
+		Subtask_Entry entry{ recipe, agents };
+		auto it = handoff_ref.find(entry);
+		if (it != handoff_ref.end()) {
+			handoff_ref.erase(it);
+		}
+
+		// Erase path
+		auto& handoff_path_ref = handoff_paths.at(handoff_agent.id);
+		for (auto path = handoff_path_ref.begin(); path != handoff_path_ref.end(); ++path) {
+			if (agents == path->agents && recipe == path->recipe) {
+				handoff_path_ref.erase(path);
+				break;
+			}
+		}
+
+		// Insert info and path
+		insert(actions, recipe, agents, main_agent, handoff_agent, state, environment);
+	}
 	
 	const std::set<Action_Path>& get_normal() const { 
 		return normal_paths; 
@@ -194,12 +246,13 @@ private:
 };
 
 struct Collaboration_Info {
-	Collaboration_Info() : length(EMPTY_VAL), last_action(EMPTY_VAL), combination(), recipes(), 
+	Collaboration_Info() : length(EMPTY_VAL), 
+		combination(), recipes(), 
 		next_action(), value(EMPTY_VAL), permutation() {};
 
-	Collaboration_Info(size_t length, size_t last_action, Agent_Combination combination, const std::vector<Recipe> recipes,
+	Collaboration_Info(size_t length, Agent_Combination combination, const std::vector<Recipe> recipes,
 		Action next_action, Agent_Combination permutation)
-		: length(length), last_action(last_action), combination(combination), recipes(recipes), 
+		: length(length), combination(combination), recipes(recipes), 
 			next_action(next_action), value(EMPTY_VAL), permutation(permutation){};
 
 	std::string to_string() const {
@@ -207,7 +260,8 @@ struct Collaboration_Info {
 		for (const auto& recipe : recipes) {
 			result += recipe.result_char();
 		}
-		result += combination.to_string() + ":" + permutation.to_string();
+		result += ":" + combination.to_string_raw() 
+			+ ":" + permutation.to_string_raw();
 		
 		return result;
 	}
@@ -217,7 +271,7 @@ struct Collaboration_Info {
 	}
 
 	size_t length;
-	size_t last_action;
+	//size_t last_action;
 	Agent_Combination combination;
 	Agent_Combination permutation;
 	std::vector<Recipe> recipes;
@@ -427,6 +481,23 @@ struct Colab_Collection {
 	float value;
 };
 
+struct Temp {
+	Temp(const Action_Path& path, size_t handoff_agent_index)
+		: path(path), handoff_agent_index(handoff_agent_index), length(path.size()),
+		handoff_time(path.last_action) {}
+
+	Action_Path path;
+	size_t handoff_agent_index;
+	mutable size_t length;
+	mutable size_t handoff_time;
+
+	bool operator<(const Temp& other) const {
+		if (handoff_time != other.handoff_time) return handoff_time < other.handoff_time;
+		return handoff_agent_index < other.handoff_agent_index;
+	}
+};
+
+
 class Planner {
 
 
@@ -436,8 +507,6 @@ public:
 
 private:
 	Paths get_all_paths(const std::vector<Recipe>& recipes, const State& state);
-	Action get_best_action(const Paths& paths, const std::vector<Recipe>& recipes) const;
-	bool agent_in_best_solution(const std::map<Recipe, Recipe_Solution>& best_solutions, const Action_Path& action_path) const;
 	bool ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const;
 	void initialize_reachables(const State& initial_state);
 	void initialize_solutions();
@@ -454,20 +523,39 @@ private:
 		std::vector<Collaboration_Info>::const_iterator it_in,
 		const std::map<Ingredient, size_t>& available_ingredients);
 
-	std::pair<size_t, Agent_Combination> get_best_permutation(const Agent_Combination& agents, 
+	std::optional<Collaboration_Info> get_best_permutation(const Agent_Combination& agents, 
 		const std::vector<Recipe>& recipes, const Paths& paths,
 		const std::vector<std::vector<Agent_Id>>& agent_permutations,
 		const State& state);
 
-	bool is_conflict_in_permutation(const Agent_Combination& best_permutation,
-		const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
-		const State& state);
+	bool is_conflict_in_permutation(const State& initial_state, 
+		const std::vector<Joint_Action>& actions);
+
 	Collaboration_Info get_action_from_permutation(const Agent_Combination& best_permutation,
 		const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
 		const size_t& best_length);
-	std::pair<size_t, const Subtask_Info*> get_actions_from_permutation_inner(
-		const Agent_Combination& best_permutation, const std::vector<Recipe>& recipes, 
-		const Paths& paths, const Agent_Combination& agents, const Agent_Id& acting_agent);
+
+	std::pair<std::vector<Joint_Action>, std::map<Recipe, Agent_Combination>> get_actions_from_permutation(
+		const Agent_Combination& permutation, const std::vector<Action_Path>& action_paths, size_t agent_size,
+		const State& state);
+
+	std::pair<std::vector<Action>, Recipe> get_actions_from_permutation_inner(
+		const Agent_Combination& permutation, const Agent_Id& acting_agent,
+		const std::vector<Action_Path>& action_paths, size_t action_trace_length,
+		const State& state);
+
+	std::vector<std::set<Temp>> get_agent_handoff_infos( 
+		const Agent_Combination& agents, const std::vector<Agent_Id>& agent_permutation, 
+		const std::vector<Action_Path>& action_paths);
+	std::vector<size_t> calculate_adjusted_agent_handoffs(std::vector<std::set<Temp>>& agents_handoffs);
+
+	size_t get_permutation_length(const Agent_Combination& agents,
+		const std::vector<Agent_Id>& agent_permutation, const std::vector<Action_Path>& action_paths);
+
+	std::optional<std::vector<Action_Path>> get_permutation_action_paths(const Agent_Combination& agents,
+		const std::vector<Recipe>& recipes, const Paths& paths, const std::vector<Agent_Id>& agent_permutation) const;
+
+	bool is_agent_abused(const std::vector<Agent_Id>& agent_permutation, const std::vector<Action_Path>& action_paths) const;
 
 	Recogniser recogniser;
 	Search search;

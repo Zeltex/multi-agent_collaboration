@@ -147,7 +147,9 @@ class A_Star : public Search_Method {
 public:
 	A_Star(const Environment& environment, size_t depth_limit);
 	std::vector<Joint_Action> search_joint(const State& state, Recipe recipe, 
-		const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) override;
+		const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent,
+		const std::vector<Joint_Action>& input_actions, 
+		const Agent_Combination& free_agents) override;
 private:
 	size_t	get_action_cost(const Joint_Action& action) const;
 	
@@ -171,6 +173,9 @@ private:
 		const Node* current_node, const std::optional<Agent_Id>& handoff_agent) const;
 	
 	std::vector<Joint_Action> extract_actions(const Node* node) const;
+
+	bool action_conforms_to_input(const Node* current_node, const std::vector<Joint_Action>& input_actions,
+		const Joint_Action action, const Agent_Combination& agents) const;
 
 	Heuristic heuristic;
 };

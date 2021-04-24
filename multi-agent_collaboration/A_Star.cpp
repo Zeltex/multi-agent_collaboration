@@ -8,12 +8,23 @@
 A_Star::A_Star(const Environment& environment, size_t depth_limit) 
 	: Search_Method(environment, depth_limit), heuristic(environment) {
 }
-
+/**
+original_state	Initial state to search from
+recipe			Recipe to perform
+agents			All agents allowed to move
+handoff_agent	Agent not allowed to perform the goal action
+input_actions	Fixed initial actions for agents not in free_agents
+free_agents		Agents allowed any move any time
+*/
 
 std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
-		Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent) {
+		Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent, 
+	const std::vector<Joint_Action>& input_actions, const Agent_Combination& free_agents) {
+
 	heuristic.set(recipe.ingredient1, recipe.ingredient2, agents, handoff_agent);
-	PRINT(Print_Category::A_STAR, Print_Level::VERBOSE, std::string("\n\nStarting search ") + recipe.result_char() + " " + agents.to_string() +(handoff_agent.has_value() ? "/" + std::to_string(handoff_agent.value().id) : "") + "\n\n");
+	PRINT(Print_Category::A_STAR, Print_Level::VERBOSE, std::string("\n\nStarting search ") 
+		+ recipe.result_char() + " " + agents.to_string() +(handoff_agent.has_value() ? "/" 
+		+ std::to_string(handoff_agent.value().id) : "") + "\n\n");
 
 	Node_Queue frontier;
 	Node_Set visited;
@@ -22,6 +33,7 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 	Node* goal_node = nullptr;
 	auto actions = get_actions(agents, handoff_agent.has_value());
 	auto source = original_state;
+	size_t input_action_size = input_actions.size();
 	//source.purge(agents);
 
 	initialize_variables(frontier, visited, nodes, source, handoff_agent);
@@ -41,6 +53,12 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 		//print_current(current_node);
 
 		for (const auto& action : actions) {
+
+			// Fits the requirement for initial actions
+			if (!action_conforms_to_input(current_node, input_actions, action, free_agents)) {
+				continue;
+			}
+
 
 			// Perform action if valid
 			auto [action_valid, new_node] = check_and_perform(action, nodes, current_node, handoff_agent);
@@ -92,6 +110,27 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 	return result_actions;
 }
 
+bool A_Star::action_conforms_to_input(const Node* current_node, const std::vector<Joint_Action>& input_actions,
+	const Joint_Action action, const Agent_Combination& free_agents) const {
+	size_t input_action_size = input_actions.size();
+
+	// Handoff action, true by default
+	if (!action.is_action_valid()) {
+		return true;
+	}
+
+	if (current_node->g < input_action_size) {
+		auto& action_ref = input_actions.at(current_node->g);
+		for (size_t action_index = 0; action_index < action_ref.actions.size(); ++action_index) {
+			if (!free_agents.contains({ action_index })
+				&& action_ref.get_action({ action_index }) != action.get_action({ action_index })) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 std::vector<Joint_Action> A_Star::extract_actions(const Node* node) const {
 	std::vector<Joint_Action> result;
 	while (node->parent != nullptr) {
@@ -110,14 +149,14 @@ std::vector<Joint_Action> A_Star::extract_actions(const Node* node) const {
 bool A_Star::is_invalid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, const std::optional<Agent_Id>& handoff_agent) const {
 	return node->state.contains_item(recipe.result) 
 		&& handoff_agent.has_value() 
-		&& action.is_action_useful(handoff_agent.value());
+		&& action.is_action_non_trivial(handoff_agent.value());
 }
 
 bool A_Star::is_valid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, const std::optional<Agent_Id>& handoff_agent) const {
 	return node->state.contains_item(recipe.result)
 		&& (!handoff_agent.has_value()
 			|| (node->has_agent_passed() 
-				&& !action.is_action_useful(handoff_agent.value())));
+				&& !action.is_action_non_trivial(handoff_agent.value())));
 }
 
 void A_Star::print_current(const Node* node) const {
@@ -132,7 +171,7 @@ std::pair<bool, Node*> A_Star::check_and_perform(const Joint_Action& action, Nod
 	if (current_node->has_agent_passed() 
 		&& action.is_action_valid()
 		&& handoff_agent.has_value() 
-		&& action.is_action_useful(handoff_agent.value())) {
+		&& action.is_action_non_trivial(handoff_agent.value())) {
 
 		return { false, nullptr };
 	}

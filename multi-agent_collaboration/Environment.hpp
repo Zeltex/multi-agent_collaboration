@@ -135,6 +135,14 @@ struct Action {
 	Direction direction;
 	Agent_Id agent;
 
+	bool operator!=(const Action& other) const {
+		return !(*this == other);
+	}
+
+	bool operator==(const Action& other) const {
+		return direction == other.direction && agent == other.agent;
+	}
+
 	std::string to_string() const {
 		return std::string(1, static_cast<char>(direction)) + ":" + std::to_string(agent.id);
 	}
@@ -149,6 +157,11 @@ struct Action {
 
 struct Joint_Action {
 	Joint_Action() : actions() {};
+	Joint_Action(size_t number_of_agents) : actions() {
+		for (size_t action_index = 0; action_index < number_of_agents; ++action_index) {
+			actions.emplace_back(Direction::NONE, Agent_Id{ action_index });
+		}
+	};
 	Joint_Action(std::vector<Action> actions) : actions(actions) {};
 
 	std::vector<Action> actions;
@@ -164,7 +177,7 @@ struct Joint_Action {
 		}
 	}
 
-	bool is_action_useful(Agent_Id agent) const {
+	bool is_action_non_trivial(Agent_Id agent) const {
 		assert(actions.size() > agent.id);
 		return actions.at(agent.id).direction != Direction::NONE;
 	}
@@ -237,6 +250,11 @@ struct Agent_Combination {
 	std::vector<Agent_Id> agents;
 	std::string pretty_print;
 
+	void add(Agent_Id agent) {
+		agents.push_back(agent);
+		generate_pretty_print();
+	}
+
 	bool operator<(const Agent_Combination& other) const {
 		if (agents.size() != other.agents.size()) return agents.size() < other.agents.size();
 		for (size_t i = 0; i < agents.size(); ++i) {
@@ -251,6 +269,14 @@ struct Agent_Combination {
 			if (agents.at(i) != other.agents.at(i)) return true;
 		}
 		return false;
+	}
+
+	bool operator==(const Agent_Combination& other) const {
+		if (agents.size() != other.agents.size()) return false;
+		for (size_t i = 0; i < agents.size(); ++i) {
+			if (agents.at(i) != other.agents.at(i)) return false;
+		}
+		return true;
 	}
 
 	bool contains(Agent_Id agent) const {
@@ -305,6 +331,14 @@ struct Agent_Combination {
 
 	const std::string& to_string() const {
 		return pretty_print;
+	}
+
+	std::string to_string_raw() const {
+		std::string result;
+		for (const auto& agent : agents) {
+			result += std::to_string(agent.id);
+		}
+		return result;
 	}
 
 	void remove(Agent_Id agent) {
