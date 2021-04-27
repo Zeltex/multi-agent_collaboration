@@ -28,12 +28,15 @@ struct Solution {
 void solve(Environment& environment) {
 	//open-divider_salad.txt
 
-	//auto paths = get_all_files("../levels/BD/");
-	std::vector<std::string> paths{ "../levels/BD/partial-divider_salad.txt" };
+	auto paths = get_all_files("../levels/BD/");
+	//std::vector<std::string> paths{ "../levels/BD/partial-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/partial-divider_tl.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/partial-divider_tomato.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/full-divider_salad.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/full-divider_tl.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_tl.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/open-divider_tomato.txt" };
 	//std::vector<std::string> paths{ "../levels/Test_Scenarios/L1.txt" };
 	
 	std::vector<Solution> solutions;
@@ -54,7 +57,7 @@ void solve(Environment& environment) {
 			for (auto& planner : planners) {
 				actions.push_back(planner.get_next_action(state));
 			}
-			if (!environment.act(state, { actions })) {
+			if (!environment.act(state, { actions }) || action_count == 100) {
 				action_count = 0;
 				break;
 			}
@@ -72,7 +75,6 @@ void solve(Environment& environment) {
 	for (const auto& solution : solutions) {
 		std::cout << solution.actions << " : " << solution.time << " : " << solution.path << std::endl;
 	}
-	size_t something;
 	std::cout << " - " << std::endl;
 }
 

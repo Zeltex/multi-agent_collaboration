@@ -243,6 +243,7 @@ State Environment::load(const std::string& path) {
 	std::string line;
 	
 	if (!file) {
+		system("pwd");
 		std::cerr << "Could not load file at path " << path << std::endl;
 		exit(-1);
 	}
