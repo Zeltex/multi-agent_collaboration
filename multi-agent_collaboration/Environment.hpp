@@ -410,13 +410,15 @@ private:
 	void check_collisions(const State& state, Joint_Action& joint_action) const;
 	void reset();
 	void calculate_recipes();
+	bool does_recipe_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count,
+		const std::pair<std::pair<Ingredient, Ingredient>, Ingredient>& recipe_in) const;
 
 	size_t width;
 	size_t height;
 
 	size_t number_of_agents;
 	std::vector<std::string> goal_names;
-	std::vector<Ingredient> goal_ingredients;
+	std::vector<Ingredient> goal_ingredients;			// TODO - This currently does not support multiple ingredients of same type
 	std::vector<Coordinate> agents_initial_positions;
 
 	std::vector<std::vector<bool>> walls;

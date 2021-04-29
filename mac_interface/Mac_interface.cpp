@@ -10,7 +10,7 @@ size_t time_step;
 Environment environment(2);
 State state;
 Agent_Id agent_id(EMPTY_VAL);
-Planner planner(environment, agent_id, state);
+Planner_Mac planner(environment, agent_id, state);
 
 std::vector<Direction> fixed_actions{ Direction::DOWN, Direction::LEFT, Direction::UP, Direction::RIGHT };
 
@@ -80,7 +80,7 @@ PyObject* mac_init(PyObject*, PyObject* o) {
     environment = Environment(agent_size);
     state = environment.load(file_name);
 
-    planner = Planner(environment, agent_id, state);
+    planner = Planner_Mac(environment, agent_id, state);
     std::cout << "mac_init finished" << std::endl;
     return PyLong_FromLong(2);
 }

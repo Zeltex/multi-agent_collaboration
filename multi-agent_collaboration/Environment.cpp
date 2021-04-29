@@ -469,6 +469,7 @@ std::optional<Ingredient> Environment::get_recipe(Ingredient ingredient1, Ingred
 std::vector<Recipe> Environment::get_possible_recipes(const State& state) const {
 	//auto& recipes = get_recipes();
 	std::vector<Recipe> possible_recipes;
+	auto ingredients_count_in = state.get_ingredients_count();
 
 	for (const auto& recipe : goal_related_recipes) {
 
@@ -477,10 +478,78 @@ std::vector<Recipe> Environment::get_possible_recipes(const State& state) const 
 			|| recipe.ingredient1 == Ingredient::CUTTING 
 			|| recipe.ingredient1 == Ingredient::DELIVERY) 
 			&& state.contains_item(recipe.ingredient2)) {
-			possible_recipes.push_back(recipe);
+
+			auto ingredients_count = ingredients_count_in;
+			//if (!is_type_stationary(recipe.ingredient1)) {
+			//	ingredients_count.at(recipe.ingredient1)--;
+			//}
+			//ingredients_count.at(recipe.ingredient2)--;
+
+			//auto it_result = ingredients_count.find(recipe.result);
+			//if (it_result == ingredients_count.end()) {
+			//	ingredients_count.insert({ recipe.result, 1 });
+			//} else {
+			//	it_result->second++;
+			//}
+
+			if (does_recipe_lead_to_goal(ingredients_count, { {recipe.ingredient1, recipe.ingredient2}, recipe.result })) {
+				possible_recipes.push_back(recipe);
+			}
 		}
 	}
 	return possible_recipes;
+}
+
+bool Environment::does_recipe_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count_in,
+	const std::pair<std::pair<Ingredient, Ingredient>, Ingredient>& recipe_in) const {
+
+	// Calculate updated ingredients count
+	auto ingredients_count = ingredients_count_in;
+	if (!is_type_stationary(recipe_in.first.first)) {
+		ingredients_count.at(recipe_in.first.first)--;
+	}
+	ingredients_count.at(recipe_in.first.second)--;
+
+	auto it_result = ingredients_count.find(recipe_in.second);
+	if (it_result == ingredients_count.end()) {
+		ingredients_count.insert({ recipe_in.second, 1 });
+	} else {
+		it_result->second++;
+	}
+
+	// TODO - This currently does not support multiple ingredients of same type
+	// Check goal condition
+	bool goal_found = true;
+	for (const auto& goal_ingredient : goal_ingredients) {
+		auto it = ingredients_count.find(goal_ingredient);
+		if (it == ingredients_count.end() || it->second == 0) {
+			goal_found = false;
+			break;
+		}
+	}
+	if (goal_found) {
+		return true;
+	}
+
+	// Recurse on recipes
+	const auto& recipes = get_recipes();
+	for (const auto& recipe : recipes) {
+		if (!is_type_stationary(recipe.first.first)) {
+			auto it = ingredients_count.find(recipe.first.first);
+			if (it == ingredients_count.end() || it->second == 0) {
+				continue;
+			}
+		}
+		auto it = ingredients_count.find(recipe.first.second);
+		if (it == ingredients_count.end() || it->second == 0) {
+			continue;
+		}
+
+		if (does_recipe_lead_to_goal(ingredients_count, recipe)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 const std::vector<Recipe>& Environment::get_all_recipes() const {

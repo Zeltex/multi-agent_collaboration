@@ -6,9 +6,10 @@
 #include <sstream>
 #include <iomanip>
 
-constexpr auto WINDOW_SIZE = 3; 
-constexpr auto alpha = 30.0f;			// Inverse weight of solution length in goal probability
+constexpr auto WINDOW_SIZE = 4; 
+constexpr auto alpha = 100.0f;			// Inverse weight of solution length in goal probability
 constexpr auto beta = 0.9f;				// Adjust NONE probability scale
+constexpr auto charlie = 0.8;			// Threshold for goal being probable
 
 Sliding_Recogniser::Sliding_Recogniser(const Environment& environment, const State& initial_state)
 	: Recogniser_Method(environment, initial_state), goals(), time_step(0) {
@@ -217,16 +218,20 @@ bool Sliding_Recogniser::is_probable(Goal goal_input) const {
 	}
 	auto probability = it_input->second.probability;
 
-	for (size_t i = 0; i < goal_input.agents.size() - 1; ++i) {
-		auto combinations = get_combinations<Agent_Id>(goal_input.agents.get(), i+1);
-		for (auto& combination : combinations) {
-			Goal goal{ Agent_Combination{combination}, goal_input.recipe };
-			auto it = goals.find(goal);
-			if (it != goals.end() && it->second.probability >= probability) {
-				return false;
-			}
-		}
+	if (probability < charlie) {
+		return false;
 	}
+
+	//for (size_t i = 0; i < goal_input.agents.size() - 1; ++i) {
+	//	auto combinations = get_combinations<Agent_Id>(goal_input.agents.get(), i+1);
+	//	for (auto& combination : combinations) {
+	//		Goal goal{ Agent_Combination{combination}, goal_input.recipe };
+	//		auto it = goals.find(goal);
+	//		if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= probability) {
+	//			return false;
+	//		}
+	//	}
+	//}
 	return true;
 }
 
