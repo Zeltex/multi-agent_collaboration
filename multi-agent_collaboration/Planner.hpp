@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Environment.hpp"
+
 enum class Planner_Types {
 	MAC,
 	STILL

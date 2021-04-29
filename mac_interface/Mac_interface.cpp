@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 
+#include "Environment.hpp"
+#include "State.hpp"
+#include "Planner_Mac.hpp"
 #include "Planner.hpp"
 
 size_t time_step;
