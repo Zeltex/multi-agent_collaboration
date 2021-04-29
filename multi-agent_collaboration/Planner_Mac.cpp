@@ -776,16 +776,32 @@ bool Planner_Mac::ingredients_reachable(const Recipe& recipe, const Agent_Combin
 		std::cerr << "Unknown agent combination" << std::endl;
 		exit(-1);
 	}
-
-	for (const auto& location : environment.get_coordinates(state, recipe.ingredient1)) {
-		if (!reachables->second.get(location)) {
-			return false;
+	bool skip1 = false, skip2 = false;
+	for (const auto& agent_entry : agents.get()) {
+		const auto& agent = state.get_agent(agent_entry);
+		if (agent.item.has_value()) {
+			if (agent.item.value() == recipe.ingredient1) {
+				skip1 = true;
+			}
+			if (agent.item.value() == recipe.ingredient2) {
+				skip2 = true;
+			}
+		}
+	}
+	
+	if (!skip1) {
+		for (const auto& location : environment.get_coordinates(state, recipe.ingredient1)) {
+			if (!reachables->second.get(location)) {
+				return false;
+			}
 		}
 	}
 
-	for (const auto& location : environment.get_coordinates(state, recipe.ingredient2)) {
-		if (!reachables->second.get(location)) {
-			return false;
+	if (!skip2) {
+		for (const auto& location : environment.get_coordinates(state, recipe.ingredient2)) {
+			if (!reachables->second.get(location)) {
+				return false;
+			}
 		}
 	}
 	return true;
