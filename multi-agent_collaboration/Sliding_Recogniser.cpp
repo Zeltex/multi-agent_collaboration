@@ -48,6 +48,7 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 			auto length_prob = (alpha / (new_length + alpha));
 			//val.probability = (alpha * 1.0f / val.lengths.at(window_index))
 			auto progress_prob = ((float)val.lengths.at(window_index)) / (val.lengths.at(time_step - 1) + window_length);
+			progress_prob = std::pow(progress_prob, key.agents.size());
 
 			if (window_length == 0) {
 				constexpr float new_goal_penalty = 0.8f;
@@ -235,6 +236,42 @@ bool Sliding_Recogniser::is_probable(Goal goal_input) const {
 	return true;
 }
 
+bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id agent) const {
+	float highest_prob = 0.0f;
+	auto it = goals.find(goal);
+	if (it == goals.end()) {
+		return false;
+	}
+
+	for (const auto& goal : available_goals) {
+		if (!goal.agents.contains(agent)) {
+			continue;
+		}
+		auto inner_it = goals.find(goal);
+		if (inner_it != goals.end() && inner_it->second.probability > highest_prob) {
+			highest_prob = inner_it->second.probability;
+		}
+	}
+
+	// Check none-probability
+	auto non_prob = goals.at(Goal{ Agent_Combination{agent}, EMPTY_RECIPE });
+	if (non_prob.probability > highest_prob) {
+		highest_prob = non_prob.probability;
+	}
+
+	if (highest_prob == 0.0f) {
+		return false;
+	}
+
+	auto normalised_prob = it->second.probability / highest_prob;
+
+	std::stringstream buffer;
+	buffer << std::setprecision(3);
+	buffer << "Norm Prob: " << goal.recipe.result_char() << goal.agents.to_string() << " : " << agent.id << " = " << normalised_prob << "\n";
+	PRINT(Print_Category::RECOGNISER, Print_Level::DEBUG, buffer.str());
+
+	return normalised_prob >= charlie;
+}
 
 float Sliding_Recogniser::get_probability(const Goal& goal) const {
 	auto it = goals.find(goal);

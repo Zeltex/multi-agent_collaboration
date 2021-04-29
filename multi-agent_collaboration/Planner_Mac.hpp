@@ -558,6 +558,14 @@ private:
 
 	bool is_agent_abused(const std::vector<Agent_Id>& agent_permutation, const std::vector<Action_Path>& action_paths) const;
 
+	std::map<Multi_Goal, float> calculate_goal_values(std::vector<Collaboration_Info>& infos);
+
+	std::vector<Collaboration_Info> calculate_probable_multi_goals(const std::vector<Collaboration_Info>& infos,
+		const std::map<Multi_Goal, float>& goal_values, const State& state);
+
+	std::vector<Collaboration_Info> calculate_infos(const Paths& paths, const std::vector<Recipe>& recipes_in,
+		const State& state);
+
 	Recogniser recogniser;
 	Search search;
 	std::map<Agent_Combination, Reachables> agent_reachables;

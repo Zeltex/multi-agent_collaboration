@@ -57,6 +57,28 @@ Action Planner_Mac::get_next_action(const State& state) {
 std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Paths& paths, const std::vector<Recipe>& recipes_in, 
 	const std::map<Agent_Id, Goal>& goals, const State& state) {
 	
+	auto infos = calculate_infos(paths, recipes_in, state);
+	auto goal_values = calculate_goal_values(infos);
+	auto probable_infos = calculate_probable_multi_goals(infos, goal_values, state);
+	size_t max_tasks = environment.get_number_of_agents();
+	auto info = get_best_collaboration(probable_infos, max_tasks, state);
+
+
+	std::stringstream buffer3;
+	if (info.has_value()) {
+		buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action " 
+			<< info.next_action.to_string() << "\n";
+		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
+		return info;
+	} else {
+		buffer3 << "Agent " << planning_agent.id << " did not find relevant action\n";
+		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
+		return {};
+	}
+}
+
+std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths, const std::vector<Recipe>& recipes_in,
+	const State& state) {
 	size_t total_agents = environment.get_number_of_agents();
 	std::vector<Agent_Id> all_agents;
 
@@ -64,7 +86,7 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 	std::vector<std::vector<std::vector<Recipe>>> all_recipe_combinations;
 	size_t recipe_in_size = recipes_in.size();
 	for (size_t i = 0; i < total_agents && i < recipe_in_size; ++i) {
-		all_recipe_combinations.push_back(get_combinations(recipes_in, i+1));
+		all_recipe_combinations.push_back(get_combinations(recipes_in, i + 1));
 	}
 
 	// Precalculate agent permutations for all agent sizes
@@ -82,7 +104,7 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 		size_t agent_size = agents.size();
 
 		// Iterate setups for agent_combination
-		for (size_t recipe_combination_index = 0; recipe_combination_index < agent_size 
+		for (size_t recipe_combination_index = 0; recipe_combination_index < agent_size
 			&& recipe_combination_index < recipe_in_size; ++recipe_combination_index) {
 
 			for (const auto& recipes : all_recipe_combinations.at(recipe_combination_index)) {
@@ -92,13 +114,13 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 					auto info = paths.get_normal(planning_agent, entry);
 					if (info.has_value()) {
 						auto& info_val = info.value();
-						Collaboration_Info result = { info_val->length, agents, recipes, 
+						Collaboration_Info result = { info_val->length, agents, recipes,
 							info_val->action(agents.get().at(0)), agents };
 
 						infos.push_back(result);
 					}
 				} else {
-					auto info = get_best_permutation(agents, recipes, paths, agent_permutations.at(recipes.size()-1), state);
+					auto info = get_best_permutation(agents, recipes, paths, agent_permutations.at(recipes.size() - 1), state);
 
 					if (info.has_value()) {
 						infos.push_back(std::move(info.value()));
@@ -107,40 +129,23 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 			}
 		}
 	}
+	return infos;
+}
 
-	Collaboration_Info* best_info = nullptr;
-	float lowest_val = HIGH_INIT_VAL;
-	std::stringstream buffer1, buffer2;
+std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(const std::vector<Collaboration_Info>& infos,
+	const std::map<Multi_Goal, float>& goal_values, const State& state) {
+	std::vector<bool> are_probable;
+	std::stringstream buffer1;
+	std::stringstream buffer2;
 	buffer2 << std::setprecision(3);
+	std::vector<Goal> normalisation_goals;
 
-	std::map<Multi_Goal, float> goal_values;
 
-	for (auto& entry : infos) {
-		buffer1 << entry.to_string() << "\t";
-
-		//for (auto& recipe : entry.recipes) {
-		//	if (!recogniser.is_probable({ entry.combination, recipe })) {
-		//		//__debugbreak;
-		//		is_probable = false;
-		//		break;
-		//	}
-		//}
-
-		auto penalty = std::pow(GAMMA, entry.combination.size() - entry.recipes.size());
-		entry.value = (penalty * entry.length) / entry.recipes.size();
-		goal_values.insert({ Multi_Goal{entry.combination, entry.recipes}, entry.value });
-	}
-
-	std::vector<Collaboration_Info> probable_infos;
-	probable_infos.reserve(infos.size());
-
-	size_t max_tasks = 0;
 	for (auto& info_entry : infos) {
 		bool is_probable = true;
 		bool is_coop_better = true;
+		buffer1 << info_entry.to_string() << "\t";
 
-		// TODO - Generalse to more recipes
-		//if (entry.recipes.size() == 1 && entry.combination.size() > 1) {
 		if (info_entry.combination.size() > 1) {
 
 			// If collaborating on multiple tasks, check if all tasks could be done faster seperately
@@ -153,13 +158,13 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 						task_faster_coop = true;
 					}
 				}
-				is_coop_better &= task_faster_coop;
+				is_probable &= task_faster_coop;
 			}
 
 			// TODO - should probably do this with all agent combinations of size |combination|-1
 			auto combinations = get_combinations<Agent_Id>(info_entry.combination.get(), info_entry.combination.size() - 1);
 			for (const auto& combination : combinations) {
-				auto it = goal_values.find(Multi_Goal({ Agent_Combination{combination}, info_entry.recipes}));
+				auto it = goal_values.find(Multi_Goal({ Agent_Combination{combination}, info_entry.recipes }));
 				if (it != goal_values.end()) {
 					if (it->second <= info_entry.value) {
 						is_probable = false;
@@ -187,54 +192,70 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 					++(it->second);
 				}
 			}
-
 			for (const auto& [ingredient, count] : ingredients) {
-				if (!environment.is_type_stationary(ingredient) 
+				if (!environment.is_type_stationary(ingredient)
 					&& state.get_count(ingredient) < count) {
-					
+
 					is_probable = false;
 					break;
 				}
 			}
 		}
-
-		// If recogniser sees all subtask allocations as probable
-		if (info_entry.combination.size() != 1 || info_entry.combination.get().at(0) != planning_agent) {
+		are_probable.push_back(is_probable);
+		if (is_probable && info_entry.recipes.size() == 1) {
 			for (const auto& recipe : info_entry.recipes) {
-				is_probable &= recogniser.is_probable(Goal{ info_entry.combination, recipe });
+				normalisation_goals.push_back({ info_entry.combination, recipe });
 			}
 		}
+	}
 
+	// Check if recipes are probable normalised on available tasks
+	for (size_t i = 0; i < infos.size(); ++i) {
+		const auto& info_entry = infos.at(i);
+		std::vector<bool>::reference is_probable = are_probable.at(i);
+		
+		// If recogniser sees all subtask allocations as probable
+		if (is_probable
+			&& (info_entry.combination.size() != 1 || info_entry.combination.get().at(0) != planning_agent)) {
 
+			for (const auto& recipe : info_entry.recipes) {
+				bool inner_probable = false;
+				for (const auto& agent : info_entry.combination.get()) {
+					if (recogniser.is_probable_normalised(Goal{ info_entry.combination, recipe }, normalisation_goals, agent)) {
+						inner_probable = true;
+						break;
+					}
+				}
+				if (!inner_probable) {
+					is_probable = false;
+				}
+			}
 
-		is_probable = is_probable && is_coop_better;
-		if (is_probable && is_coop_better) {
-			probable_infos.push_back(info_entry);
-			max_tasks = std::max(max_tasks, info_entry.recipes.size());
 		}
 		buffer2 << (is_probable ? "" : "X") << info_entry.value << "\t";
 	}
 
+	// Copy probable infos
+	std::vector<Collaboration_Info> result_infos;
+	for (size_t i = 0; i < infos.size(); ++i) {
+		if (are_probable.at(i)) {
+			result_infos.push_back(infos.at(i));
+		}
+	}
+
 	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer1.str() + '\n');
 	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer2.str() + "\n\n");
+	return result_infos;
+}
 
-	// Testing this out
-	max_tasks = all_agents.size();
-
-	auto info = get_best_collaboration(probable_infos, max_tasks, state);
-
-
-	std::stringstream buffer3;
-	if (info.has_value()) {
-		buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action " 
-			<< info.next_action.to_string() << "\n";
-		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
-		return info;
-	} else {
-		buffer3 << "Agent " << planning_agent.id << " did not find relevant action\n";
-		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
-		return {};
+std::map<Multi_Goal, float> Planner_Mac::calculate_goal_values(std::vector<Collaboration_Info>& infos) {
+	std::map<Multi_Goal, float> goal_values;
+	for (auto& entry : infos) {
+		auto penalty = std::pow(GAMMA, entry.combination.size() - entry.recipes.size());
+		entry.value = (penalty * entry.length) / entry.recipes.size();
+		goal_values.insert({ Multi_Goal{entry.combination, entry.recipes}, entry.value });
 	}
+	return goal_values;
 }
 
 constexpr size_t action_trace_length = 3;
