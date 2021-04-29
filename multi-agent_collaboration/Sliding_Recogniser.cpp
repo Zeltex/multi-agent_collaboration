@@ -10,6 +10,7 @@ constexpr auto WINDOW_SIZE = 4;
 constexpr auto alpha = 100.0f;			// Inverse weight of solution length in goal probability
 constexpr auto beta = 0.9f;				// Adjust NONE probability scale
 constexpr auto charlie = 0.8;			// Threshold for goal being probable
+//constexpr auto delta = 0.5;			// Threshold for goal being probable
 
 Sliding_Recogniser::Sliding_Recogniser(const Environment& environment, const State& initial_state)
 	: Recogniser_Method(environment, initial_state), goals(), time_step(0) {
@@ -48,7 +49,7 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 			auto length_prob = (alpha / (new_length + alpha));
 			//val.probability = (alpha * 1.0f / val.lengths.at(window_index))
 			auto progress_prob = ((float)val.lengths.at(window_index)) / (val.lengths.at(time_step - 1) + window_length);
-			progress_prob = std::pow(progress_prob, key.agents.size());
+			progress_prob = std::pow(progress_prob, 1 + (key.agents.size() - 1) * 0.5);
 
 			if (window_length == 0) {
 				constexpr float new_goal_penalty = 0.8f;

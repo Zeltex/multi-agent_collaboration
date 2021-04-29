@@ -218,18 +218,18 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 		if (is_probable
 			&& (info_entry.combination.size() != 1 || info_entry.combination.get().at(0) != planning_agent)) {
 
+			bool inner_probable = false;
 			for (const auto& recipe : info_entry.recipes) {
-				bool inner_probable = false;
 				for (const auto& agent : info_entry.combination.get()) {
 					if (recogniser.is_probable_normalised(Goal{ info_entry.combination, recipe }, normalisation_goals, agent)) {
 						inner_probable = true;
 						break;
 					}
 				}
+			}
 				if (!inner_probable) {
 					is_probable = false;
 				}
-			}
 
 		}
 		buffer2 << (is_probable ? "" : "X") << info_entry.value << "\t";
