@@ -1,6 +1,10 @@
 
 #include "Environment.hpp"
 #include "Planner.hpp"
+#include "Planner_Mac.hpp"
+#include "Planner_Still.hpp"
+#include "State.hpp"
+
 #include <iostream>
 #include <chrono>
 #include <ranges>
@@ -25,6 +29,8 @@ struct Solution {
 	std::string path;
 };
 
+
+
 void solve(Environment& environment) {
 	//open-divider_salad.txt
 
@@ -41,14 +47,27 @@ void solve(Environment& environment) {
 	
 	std::vector<Solution> solutions;
 
+	std::vector<Planner_Types> planner_types{ 
+		Planner_Types::STILL, 
+		Planner_Types::MAC 
+	};
+
 	for (const auto& path : paths) {
 		auto state = environment.load(path);
 		size_t action_count = 0;
 		auto time_start = std::chrono::system_clock::now();
 		std::vector<Planner> planners;
 		for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
-			planners.push_back(Planner{ environment, agent, state});
-
+			switch (planner_types.at(agent)) {
+			case Planner_Types::MAC: {
+				planners.emplace_back(std::make_unique<Planner_Mac>(environment, agent, state));
+				break;
+			}
+			case Planner_Types::STILL: {
+				planners.emplace_back(std::make_unique<Planner_Still>(environment, agent, state));
+				break;
+			}
+			}
 		}
 		while (!environment.is_done(state)) {
 			std::vector<Action> actions;
@@ -57,7 +76,8 @@ void solve(Environment& environment) {
 			for (auto& planner : planners) {
 				actions.push_back(planner.get_next_action(state));
 			}
-			if (!environment.act(state, { actions }) || action_count == 100) {
+			environment.act(state, { actions });
+			if (action_count == 100) {
 				action_count = 0;
 				break;
 			}

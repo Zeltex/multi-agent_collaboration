@@ -473,24 +473,12 @@ std::vector<Recipe> Environment::get_possible_recipes(const State& state) const 
 
 	for (const auto& recipe : goal_related_recipes) {
 
-		// TODO - Should handle cutting/delivery stations in a little less hardcoded way
 		if ((state.contains_item(recipe.ingredient1) 
 			|| recipe.ingredient1 == Ingredient::CUTTING 
 			|| recipe.ingredient1 == Ingredient::DELIVERY) 
 			&& state.contains_item(recipe.ingredient2)) {
 
 			auto ingredients_count = ingredients_count_in;
-			//if (!is_type_stationary(recipe.ingredient1)) {
-			//	ingredients_count.at(recipe.ingredient1)--;
-			//}
-			//ingredients_count.at(recipe.ingredient2)--;
-
-			//auto it_result = ingredients_count.find(recipe.result);
-			//if (it_result == ingredients_count.end()) {
-			//	ingredients_count.insert({ recipe.result, 1 });
-			//} else {
-			//	it_result->second++;
-			//}
 
 			if (does_recipe_lead_to_goal(ingredients_count, { {recipe.ingredient1, recipe.ingredient2}, recipe.result })) {
 				possible_recipes.push_back(recipe);

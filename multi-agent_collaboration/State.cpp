@@ -67,6 +67,14 @@ std::map<Ingredient, size_t> State::get_ingredients_count() const {
 			++(it->second);
 		}
 	}
+	for (const auto& [coord, ingredient] : goal_items) {
+		auto it = result.find(ingredient);
+		if (it == result.end()) {
+			result.insert({ ingredient, 1 });
+		} else {
+			++(it->second);
+		}
+	}
 	for (const auto& agent : agents) {
 		if (agent.item.has_value()) {
 			auto it = result.find(agent.item.value());
