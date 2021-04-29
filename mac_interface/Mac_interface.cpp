@@ -15,7 +15,7 @@ State state;
 Agent_Id agent_id(EMPTY_VAL);
 Planner_Mac planner(environment, agent_id, state);
 
-std::vector<Direction> fixed_actions{ Direction::DOWN, Direction::LEFT, Direction::UP, Direction::RIGHT };
+//std::vector<Direction> fixed_actions{ Direction::DOWN, Direction::LEFT, Direction::UP, Direction::RIGHT };
 
 std::vector<size_t> list_to_long_vector(PyObject* incoming) {
     //assert(PyList_Check(incoming));
@@ -32,6 +32,7 @@ std::vector<size_t> list_to_long_vector(PyObject* incoming) {
             data.push_back(PyLong_AsLong(value));
         }
     } else {
+        std::cout << "Unknown datatype" << std::endl;
         throw std::runtime_error("Unknown datatype");
     }
     return data;
@@ -50,6 +51,7 @@ std::vector<PyObject*> list_to_action_vector(PyObject* incoming) {
             data.push_back(PyTuple_GetItem(incoming, i));
         }
     } else {
+        std::cout << "Unknown datatype" << std::endl;
         throw std::runtime_error("Unknown datatype");
     }
     return data;
@@ -114,10 +116,10 @@ Action action_bd_to_mac(PyObject* o, Agent_Id input_agent) {
     case 1: return { Direction::DOWN, input_agent };
     case -1: return { Direction::UP, input_agent };
     }
+    return { Direction::NONE, input_agent };
 }
 
 PyObject* mac_update(PyObject*, PyObject* o) {
-    std::cout << "mac_update called" << std::endl;
 
     ++time_step;
     auto actions_raw = list_to_action_vector(PyDict_GetItemString(o, "actions"));
@@ -133,9 +135,9 @@ PyObject* mac_get_next_action(PyObject*, PyObject* o) {
     std::cout << "mac_get_next_action called" << std::endl;
 
     // Debug
-    if (time_step < fixed_actions.size()) {
-        return action_mac_to_bd({ fixed_actions.at(time_step), agent_id });
-    }
+    //if (time_step < fixed_actions.size()) {
+    //    return action_mac_to_bd({ fixed_actions.at(time_step), agent_id });
+    //}
 
     auto action = planner.get_next_action(state);
     return action_mac_to_bd(action);
