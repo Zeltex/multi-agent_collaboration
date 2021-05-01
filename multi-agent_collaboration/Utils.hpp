@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <random>
 
 #include "Environment.hpp"
 
@@ -15,5 +16,13 @@ std::vector<std::vector<T>> get_combinations(const std::vector<T>& recipes, size
 
 template <typename T>
 std::vector<std::vector<T>> get_combinations_duplicates(const std::vector<T>& input, size_t combination_size);
+
+
+extern size_t random_seed;
+extern std::default_random_engine random_engine;
+template <typename T>
+T get_random(const std::vector<T>& input);
+
+void set_random_seed(size_t seed);
 
 #include "Utils.ipp"

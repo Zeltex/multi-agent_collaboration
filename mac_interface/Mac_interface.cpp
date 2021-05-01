@@ -8,6 +8,7 @@
 #include "State.hpp"
 #include "Planner_Mac.hpp"
 #include "Planner.hpp"
+#include "Core.hpp"
 
 size_t time_step;
 Environment environment(2);
@@ -69,7 +70,7 @@ std::string to_string(PyObject* obj) {
 
 PyObject* mac_init(PyObject*, PyObject* o) {
     std::cout << "mac_init called" << std::endl;
-
+    set_logging_enabled();
     time_step = 0;
 
     auto file_name = to_string(PyDict_GetItemString(o, "file_name"));
@@ -87,6 +88,18 @@ PyObject* mac_init(PyObject*, PyObject* o) {
 
     planner = Planner_Mac(environment, agent_id, state);
     std::cout << "mac_init finished" << std::endl;
+    return PyLong_FromLong(2);
+}
+
+PyObject* mac_finish(PyObject*, PyObject* o) {
+    std::cout << "mac_finish called" << std::endl;
+
+    auto folder_name = to_string(PyDict_GetItemString(o, "file_name"));
+    folder_name = std::string(folder_name.begin() + 1, folder_name.end() - 1) ;
+    auto full_path = "misc/game/record/" + folder_name + "/mac_log.txt";
+
+    flush_log(full_path);
+
     return PyLong_FromLong(2);
 }
 
@@ -147,6 +160,7 @@ static PyMethodDef mac_interface_methods[] = {
     // The first property is the name exposed to Python, fast_tanh, the second is the C++
     // function name that contains the implementation.
     { "mac_init", (PyCFunction)mac_init, METH_O, nullptr },
+    { "mac_finish", (PyCFunction)mac_finish, METH_O, nullptr },
     { "mac_update", (PyCFunction)mac_update, METH_O, nullptr },
     { "mac_get_next_action", (PyCFunction)mac_get_next_action, METH_O, nullptr },
 
@@ -157,7 +171,7 @@ static PyMethodDef mac_interface_methods[] = {
 static PyModuleDef mac_interface_module = {
     PyModuleDef_HEAD_INIT,
     "mac_interface",                        // Module name to use with Python import statements
-    "Provides some functions, but faster",  // Module description
+    "Interface for the thesis agent",       // Module description
     0,
     mac_interface_methods                   // Structure that defines the methods of the module
 };

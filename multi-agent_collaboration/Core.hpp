@@ -25,6 +25,9 @@ void print(Print_Level level, const std::string& msg);
 void print(Print_Category category, const std::string& msg);
 void print(Print_Category category, Print_Level level, const std::string& msg);
 
+void set_logging_enabled();
+void flush_log(const std::string& file_name);
+
 #define PRINT(category, level, msg) print(category, level, msg)
 
 #define EMPTY_VAL 9999

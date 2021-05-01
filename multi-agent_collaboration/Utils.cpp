@@ -85,3 +85,10 @@ Direction get_direction(Coordinate from, Coordinate to) {
 
 	return Direction::NONE;
 }
+
+size_t random_seed = 0;
+std::default_random_engine random_engine;
+void set_random_seed(size_t seed) {
+	random_seed = seed;
+	random_engine = std::default_random_engine(seed);
+}

@@ -2,6 +2,7 @@
 #include <cassert>
 #include <algorithm>
 #include <vector>
+#include <random>
 
 template <typename T>
 std::vector<std::vector<T>> get_combinations(const std::vector<T>& recipes, size_t combination_size) {
@@ -44,4 +45,14 @@ std::vector<std::vector<T>> get_combinations_duplicates(const std::vector<T>& in
 	}
 
 	return result;
+}
+
+template <typename T>
+T get_random(const std::vector<T>& input) {
+	//static std::random_device device;
+	//static std::default_random_engine engine(random_seed);
+	//engine.seed(random_seed);
+	std::vector<T> out;
+	std::sample(input.begin(), input.end(), std::back_inserter(out), 1, random_engine);
+	return out.at(0);
 }

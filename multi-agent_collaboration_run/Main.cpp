@@ -35,20 +35,23 @@ void solve(Environment& environment) {
 	//open-divider_salad.txt
 
 	auto paths = get_all_files("../levels/BD/");
-	//std::vector<std::string> paths{ "../levels/BD/partial-divider_salad.txt" };
-	//std::vector<std::string> paths{ "../levels/BD/partial-divider_tl.txt" };
-	//std::vector<std::string> paths{ "../levels/BD/partial-divider_tomato.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/full-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/full-divider_tl.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/full-divider_tomato.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_salad.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_tl.txt" };
 	//std::vector<std::string> paths{ "../levels/BD/open-divider_tomato.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/partial-divider_salad.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/partial-divider_tl.txt" };
+	//std::vector<std::string> paths{ "../levels/BD/partial-divider_tomato.txt" };
 	//std::vector<std::string> paths{ "../levels/Test_Scenarios/L1.txt" };
+	//std::vector<std::string> paths{ "../levels/Test_Scenarios/L2.txt" };
 	
 	std::vector<Solution> solutions;
 
-	std::vector<Planner_Types> planner_types{ 
-		Planner_Types::STILL, 
+	std::vector<Planner_Types> planner_types{
+		//Planner_Types::STILL,
+		Planner_Types::MAC,
 		Planner_Types::MAC 
 	};
 

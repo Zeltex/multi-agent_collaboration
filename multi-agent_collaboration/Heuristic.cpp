@@ -35,6 +35,14 @@ void Heuristic::set(Ingredient ingredient1, Ingredient ingredient2, const Agent_
 	this->handoff_agent = handoff_agent;
 }
 
+struct Helper_Agent_Info {
+	size_t help_to_dest;	// The distance from the spot where the helper agent  
+							//	is needed to the destination 
+
+	size_t agent_to_help;	// The distance from the helper agent to the
+							//	spot where it is needed (plus optional holding penalty)
+};
+
 // Returns the optimal path length, and total distance agents must move to assist in across-wall transfers
 std::tuple<size_t, size_t, bool> Heuristic::get_helper_agents_distance(Coordinate source, Coordinate destination, 
 	const State& state, const std::optional<Agent_Id> handoff_agent, const Agent_Combination& local_agents) const {
@@ -47,10 +55,10 @@ std::tuple<size_t, size_t, bool> Heuristic::get_helper_agents_distance(Coordinat
 	const auto& dist_ref = distances.at(agent_index);
 	const auto& dist_agent_ref = distances.at(0);
 	auto prev = destination;
-	size_t total_agent_dist = 0;
 	size_t path_length = 1;
 	bool first = true;
 	bool was_handed_off = false;
+	std::vector<Helper_Agent_Info> helpers;
 	while (true) {
 		auto& prev_dist = dist_ref.const_at(source, prev);
 		if (prev_dist.parent == source) break;
@@ -84,9 +92,19 @@ std::tuple<size_t, size_t, bool> Heuristic::get_helper_agents_distance(Coordinat
 				}
 			}
 			first = false;
-			total_agent_dist += min_dist;
+			// The -1 is to account for the wall (i.e. path_length is linked to next, 
+			// but helper spot is linked to prev)
+			helpers.push_back({ path_length - 1, min_dist });
+			//total_agent_dist += min_dist;
 		}
 		prev = next;
+	}
+	size_t total_agent_dist = 0;
+	for (const auto& helper : helpers) {
+		int additional_length = (int)helper.agent_to_help - (path_length - helper.help_to_dest);
+		if (additional_length > 0) {
+			total_agent_dist += additional_length;
+		}
 	}
 	assert((distances.at(agent_index).const_at(source, destination).g == path_length));
 	return { total_agent_dist, path_length, was_handed_off };

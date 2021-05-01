@@ -186,8 +186,10 @@ void Environment::check_collisions(const State& state, Joint_Action& joint_actio
 				cancelled_agents.insert(agent1);
 				cancelled_agents.insert(agent2);
 
+			} 
+			
 			// Accessing same counter space
-			} else if (action_coordinates.at(agent1) == action_coordinates.at(agent2)) {
+			else if (action_coordinates.at(agent1) == action_coordinates.at(agent2)) {
 				cancelled_agents.insert(agent1);
 				cancelled_agents.insert(agent2);
 			}

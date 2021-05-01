@@ -513,15 +513,18 @@ size_t Planner_Mac::get_permutation_length(const Agent_Combination& agents,
 struct Temp_Info {
 
 	Temp_Info(const std::vector<Action_Path>& action_paths,
-		const Agent_Combination& permutation, size_t length)
-		: action_paths(action_paths), permutation(permutation), length(length) {};
+		const Agent_Combination& permutation, size_t length, bool planning_agent_has_action)
+		: action_paths(action_paths), permutation(permutation), length(length),
+		planning_agent_has_action(planning_agent_has_action){};
 
 	std::vector<Action_Path> action_paths;
 	Agent_Combination permutation;
 	size_t length;
+	bool planning_agent_has_action;
 
 	bool operator<(const Temp_Info& other) const {
 		if (length != other.length) return length < other.length;
+		if (planning_agent_has_action != other.planning_agent_has_action) return planning_agent_has_action;
 		return permutation < other.permutation;
 	}
 };
@@ -562,14 +565,21 @@ std::optional<Collaboration_Info> Planner_Mac::get_best_permutation(const Agent_
 		auto action_paths = get_permutation_action_paths(agents, recipes, paths, agent_permutation);
 		if (action_paths.has_value()) {
 			size_t length = get_permutation_length(agents, agent_permutation, action_paths.value());
-			permutation_infos.emplace(action_paths.value(), Agent_Combination(agent_permutation), length);
+			bool planning_agent_has_action = false;
+
+			if (agents.contains(planning_agent)) {
+				const auto& next_action_path = action_paths.value().at(0);
+				planning_agent_has_action = next_action_path.get_next_action(planning_agent).is_not_none();
+			}
+
+			permutation_infos.emplace(action_paths.value(), Agent_Combination(agent_permutation), length, planning_agent_has_action);
 			permutation_paths.emplace( Agent_Combination{agent_permutation}, std::move(action_paths.value()) );
 		}
 	}
 
 	// Best collision free
 	size_t best_length = HIGH_INIT_VAL;
-	std::optional<Collaboration_Info> best_info = {};
+	std::vector<Collaboration_Info> best_infos;
 
 	while (!permutation_infos.empty()) {
 
@@ -580,7 +590,7 @@ std::optional<Collaboration_Info> Planner_Mac::get_best_permutation(const Agent_
 
 		// If collision-free version of earlier entries is faster
 		if (best_length < length) {
-			return best_info.value();
+			return get_random<Collaboration_Info>(best_infos);
 		}
 
 		// Get conflict info
@@ -615,13 +625,18 @@ std::optional<Collaboration_Info> Planner_Mac::get_best_permutation(const Agent_
 				size_t new_length = get_permutation_length(agents, permutation.get(), action_paths.value());
 
 				// Check if best collision avoidance search so far
-				if (new_length < best_length) {
+				if (new_length <= best_length) {
 					auto [joint_actions, agent_recipes] = get_actions_from_permutation(permutation, action_paths.value(), agent_size, state);
 
 					if (!is_conflict_in_permutation(state, joint_actions)) {
 						Action planning_agent_action = joint_actions.at(0).get_action(planning_agent);
-						best_info = Collaboration_Info(new_length, agents, recipes, planning_agent_action, permutation);
-						best_length = new_length;
+
+						if (new_length < best_length) {
+							best_infos.clear();
+							best_length = new_length;
+						}
+
+						best_infos.push_back(Collaboration_Info(new_length, agents, recipes, planning_agent_action, permutation));
 					}
 				}
 			}
@@ -629,10 +644,14 @@ std::optional<Collaboration_Info> Planner_Mac::get_best_permutation(const Agent_
 		// Return unmodified entry
 		} else {
 			Action planning_agent_action = joint_actions.at(0).get_action(planning_agent);
-			return Collaboration_Info(length, agents, recipes, planning_agent_action, permutation);
+			if (length < best_length) {
+				best_infos.clear();
+				best_length = length;
+			}
+			best_infos.push_back(Collaboration_Info(length, agents, recipes, planning_agent_action, permutation));
 		}
 	}
-	return best_info.has_value() ? best_info.value() : Collaboration_Info{};
+	return !best_infos.empty() ? get_random<Collaboration_Info>(best_infos) : Collaboration_Info{};
 }
 
 Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
