@@ -498,6 +498,29 @@ bool Planner_Mac::is_agent_abused(const std::vector<Agent_Id>& agent_permutation
 	return true;
 }
 
+struct Temp2 {
+	Agent_Id agent;			// Agent
+	size_t total_length;	// From start(plus penalty if multiple handoffs from same agent) to finish
+	size_t extra_length;	// From handoff to finish
+	size_t id;
+	bool operator<(const Temp2& other) const {
+		if (total_length != other.total_length) total_length < other.total_length;
+		return id < other.id;
+	}
+};
+
+struct Temp3 {
+	size_t length;
+	size_t handoff_time;
+	Agent_Id agent;
+	size_t id;
+
+	bool operator<(const Temp3& other) const {
+		if (handoff_time != other.handoff_time) handoff_time < other.handoff_time;
+		return id < other.id;
+	}
+};
+
 size_t Planner_Mac::get_permutation_length(const Agent_Combination& agents,
 	const std::vector<Agent_Id>& agent_permutation, const std::vector<Action_Path>& action_paths){
 
@@ -505,9 +528,59 @@ size_t Planner_Mac::get_permutation_length(const Agent_Combination& agents,
 		return HIGH_INIT_VAL;
 	}
 
-	auto agents_handoffs = get_agent_handoff_infos(agents, agent_permutation, action_paths);
-	auto longest_agent_handoffs = calculate_adjusted_agent_handoffs(agents_handoffs);
-	return get_expected_length(agents_handoffs, longest_agent_handoffs);
+	// Sort tasks by handoff time
+	std::set<Temp3> sorted;
+	for (size_t i = 0; i < action_paths.size(); ++i) {
+		auto& path = action_paths.at(i);
+		auto& agent = agent_permutation.at(i);
+		sorted.insert({ path.size(), path.last_action, agent, sorted.size() });
+	}
+
+	// Calculate adjusted handoff time per agent and task
+	size_t agent_size = environment.get_number_of_agents();
+	std::vector<size_t> handoffs(agent_size, 0);
+	std::set<Temp2> tasks;
+	for (const auto& entry : sorted) {
+		size_t extra_length = entry.length;
+		if (entry.handoff_time != EMPTY_VAL) {
+			// Note the +1's are from
+			handoffs.at(entry.agent.id) += entry.handoff_time + 1;
+			extra_length -= (entry.handoff_time + 1);
+		}
+		tasks.insert({ entry.agent, entry.length, extra_length, tasks.size() });
+	}
+
+	// Distribute task completion time across agents
+	for (const auto& task : tasks) {
+
+		// Get different agent with lowest handoff time
+		size_t lowest_handoff = HIGH_INIT_VAL;
+		size_t lowest_index = EMPTY_VAL;
+		for (size_t i = 0; i < handoffs.size(); ++i) {
+			if (i == task.agent.id) {
+				continue;
+			}
+			if (handoffs.at(i) < lowest_handoff) {
+				lowest_handoff = handoffs.at(i);
+				lowest_index = i;
+			}
+		}
+
+		auto& handoff_ref = handoffs.at(lowest_index);
+		handoff_ref = std::max(handoff_ref + task.extra_length, task.total_length);
+	}
+
+	// Find max completion time
+	size_t max_length = 0;
+	for (const auto& handoff : handoffs) {
+		max_length = std::max(max_length, handoff);
+	}
+	return max_length;
+
+
+	//auto agents_handoffs = get_agent_handoff_infos(agents, agent_permutation, action_paths);
+	//auto longest_agent_handoffs = calculate_adjusted_agent_handoffs(agents_handoffs);
+	//return get_expected_length(agents_handoffs, longest_agent_handoffs);
 
 }
 
@@ -641,6 +714,8 @@ std::optional<Collaboration_Info> Planner_Mac::get_best_permutation(const Agent_
 				if (new_path.empty()) {
 					continue;
 				}
+				Search_Trimmer trim;
+				trim.trim_forward(new_path, state, environment, recipe);
 				auto new_paths = paths;
 				new_paths.update(new_path, recipe, agents, planning_agent, handoff_agent, state, environment);
 
@@ -799,6 +874,9 @@ Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State
 						PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
 
 					if (!path.empty()) {
+
+						Search_Trimmer trim;
+						trim.trim_forward(path, state, environment, recipe);
 						paths.insert(path, recipe, agents, planning_agent, handoff_agent, state, environment);
 					}
 				}
