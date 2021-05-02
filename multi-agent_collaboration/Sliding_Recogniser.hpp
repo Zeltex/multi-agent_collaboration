@@ -46,7 +46,7 @@ public:
 	Goal get_goal(Agent_Id agent) override;
 	std::map<Goal, float> get_raw_goals() const override;
 	bool is_probable(Goal goal) const override;
-	bool is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id agent) const override;
+	bool is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id agent, bool use_non_probability) const override;
 	std::map<Agent_Id, Goal> get_goals() const override;
 	void print_probabilities() const override;
 	float get_probability(const Goal& goal) const override;

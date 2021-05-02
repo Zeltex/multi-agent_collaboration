@@ -198,6 +198,10 @@ struct Joint_Action {
 	bool is_action_valid() const {
 		return !actions.empty();
 	}
+
+	size_t size() const {
+		return actions.size();
+	}
 };
 
 struct Agent {
@@ -385,15 +389,16 @@ public:
 	void print_state(const State& state) const;
 	void play(State& state) const;
 	Joint_Action convert_to_joint_action(const Action& action, Agent_Id agent) const;
+	bool do_ingredients_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count) const;
 
 	std::vector<Action>			get_actions(Agent_Id agent) const;
 	const std::vector<Recipe>&	get_all_recipes() const;
+	std::vector<Coordinate>		get_coordinates(const State& state, Ingredient ingredient) const;
 	std::vector<Ingredient>		get_goal() const;
 	size_t						get_height() const;
 	std::vector<Joint_Action>	get_joint_actions(const Agent_Combination& agents) const;
-	std::vector<Coordinate>		get_coordinates(const State& state, Ingredient ingredient) const;
-	std::vector<Coordinate>		get_neighbours(Coordinate location) const;
 	std::vector<Location>		get_locations(const State& state, Ingredient ingredient) const;
+	std::vector<Coordinate>		get_neighbours(Coordinate location) const;
 	std::vector<Location>		get_non_wall_locations(const State& state, Ingredient ingredient) const;
 	size_t						get_number_of_agents() const;
 	std::vector<Recipe>			get_possible_recipes(const State& state) const; 
@@ -412,6 +417,8 @@ private:
 	void calculate_recipes();
 	bool does_recipe_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count,
 		const std::pair<std::pair<Ingredient, Ingredient>, Ingredient>& recipe_in) const;
+
+
 
 	size_t width;
 	size_t height;

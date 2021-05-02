@@ -507,8 +507,13 @@ bool Environment::does_recipe_lead_to_goal(const std::map<Ingredient, size_t>& i
 		it_result->second++;
 	}
 
+	// Recurse on recipes
+	return do_ingredients_lead_to_goal(ingredients_count);
+}
+
+bool Environment::do_ingredients_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count) const {
 	// TODO - This currently does not support multiple ingredients of same type
-	// Check goal condition
+// Check goal condition
 	bool goal_found = true;
 	for (const auto& goal_ingredient : goal_ingredients) {
 		auto it = ingredients_count.find(goal_ingredient);
@@ -520,8 +525,7 @@ bool Environment::does_recipe_lead_to_goal(const std::map<Ingredient, size_t>& i
 	if (goal_found) {
 		return true;
 	}
-
-	// Recurse on recipes
+	
 	const auto& recipes = get_recipes();
 	for (const auto& recipe : recipes) {
 		if (!is_type_stationary(recipe.first.first)) {

@@ -55,7 +55,7 @@ public:
 	virtual std::map<Agent_Id, Goal> get_goals() const = 0;
 	virtual std::map<Goal, float> get_raw_goals() const = 0;
 	virtual bool is_probable(Goal goal) const = 0;
-	virtual bool is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id agent) const = 0;
+	virtual bool is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id agent, bool use_non_probability) const = 0;
 	virtual void print_probabilities() const = 0;
 	virtual float get_probability(const Goal& goal) const = 0;
 
@@ -91,8 +91,8 @@ public:
 		return recogniser_method->is_probable(goal);
 	}
 
-	virtual bool is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id agent) const {
-		return recogniser_method->is_probable_normalised(goal, available_goals, agent);
+	virtual bool is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id agent, bool use_non_probability) const {
+		return recogniser_method->is_probable_normalised(goal, available_goals, agent, use_non_probability);
 	}
 
 	void print_probabilities() const {

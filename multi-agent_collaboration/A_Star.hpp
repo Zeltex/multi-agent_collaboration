@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <memory>
 #include <cassert>
+#include <array>
 
 #include "Environment.hpp"
 #include "Search.hpp"
@@ -30,9 +31,11 @@ struct Node {
 	}
 
 	Node(State state, size_t id, size_t g, size_t h, size_t action_count,
-		size_t pass_time, Node* parent, Joint_Action action, bool closed, bool valid)
+		size_t pass_time, size_t handoff_first_action, 
+		Node* parent, Joint_Action action, bool closed, bool valid)
 		: state(state), id(id), g(g), h(h), action_count(action_count),
-		pass_time(pass_time), parent(parent), action(action), closed(closed), valid(valid) {};
+		pass_time(pass_time), handoff_first_action(handoff_first_action),
+		parent(parent), action(action), closed(closed), valid(valid) {};
 	
 	void init(const Node* other) {
 		this->state = other->state;
@@ -45,6 +48,7 @@ struct Node {
 		this->closed = other->closed;
 		this->valid = other->valid;
 		this->pass_time = other->pass_time;
+		this->handoff_first_action = other->handoff_first_action;
 		this->hash = EMPTY_VAL;
 	}
 
@@ -59,6 +63,7 @@ struct Node {
 	Joint_Action action;
 	bool closed;
 	bool valid;
+	size_t handoff_first_action;
 
 	// For debug purposes
 	size_t hash;
@@ -67,7 +72,9 @@ struct Node {
 	}
 
 	bool set_equals(const Node* other) const {
-		return this->state == other->state && this->pass_time == other->pass_time;
+		return this->state == other->state 
+			&& (this->pass_time == other->pass_time
+				|| (this->pass_time != EMPTY_VAL && other->pass_time != EMPTY_VAL));
 	}
 
 	size_t to_hash() const {
@@ -122,6 +129,10 @@ struct Node_Queue_Comparator {
 		if (lhs->g != rhs->g) return lhs->g < rhs->g;
 		if (lhs->action_count != rhs->action_count) return lhs->action_count > rhs->action_count;
 		if (lhs->pass_time != rhs->pass_time) return lhs->pass_time > rhs->pass_time;
+
+		if (lhs->handoff_first_action != rhs->handoff_first_action) 
+			return lhs->handoff_first_action > rhs->handoff_first_action;
+
 		return false;
 	}
 };
@@ -151,7 +162,7 @@ public:
 		const std::vector<Joint_Action>& input_actions, 
 		const Agent_Combination& free_agents) override;
 private:
-	size_t	get_action_cost(const Joint_Action& action) const;
+	size_t	get_action_cost(const Joint_Action& action, const std::optional<Agent_Id>& handoff_agent) const;
 	
 	Node*	get_next_node(Node_Queue& frontier) const;
 	
@@ -169,7 +180,7 @@ private:
 	std::vector<Joint_Action> get_actions(const Agent_Combination& agents, 
 		bool has_handoff_agent) const;
 		
-	std::pair<bool, Node*> check_and_perform(const Joint_Action& action, Node_Ref& nodes,
+	std::pair<bool, std::array<Node*, 2>> check_and_perform(const Joint_Action& action, Node_Ref& nodes,
 		const Node* current_node, const std::optional<Agent_Id>& handoff_agent) const;
 	
 	std::vector<Joint_Action> extract_actions(const Node* node) const;

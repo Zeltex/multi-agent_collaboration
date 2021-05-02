@@ -452,27 +452,60 @@ struct Colab_Collection {
 	}
 
 	bool is_compatible(const std::vector<Recipe>& recipes_in, 
-		const std::map<Ingredient, size_t>& available_ingredients,
+		const std::map<Ingredient, size_t>& available_ingredients_in,
 		const Environment& environment) const {
 		
+		// Check if enough ingredients are present
 		std::map<Ingredient, size_t> recipe_ingredients;
 		Recipes recipes;
-
 		for (const auto& info : infos) {
 			recipes.get_ingredient_counts(recipe_ingredients, info.recipes);
 		}
 		recipes.get_ingredient_counts(recipe_ingredients, recipes_in);
-
 		for (const auto& [ingredient, count] : recipe_ingredients) {
 			if (environment.is_type_stationary(ingredient)) continue;
 
-			auto it = available_ingredients.find(ingredient);
-			if (it == available_ingredients.end()){ 
+			auto it = available_ingredients_in.find(ingredient);
+			if (it == available_ingredients_in.end()){ 
 				if (count > 0) return false;
 			} else {
 				if (count > it->second) return false;
 			}
 		}
+
+		// Check if recipes can still lead to goal
+		auto available_ingredients = available_ingredients_in;
+		for (const auto& info : infos) {
+			for (const auto& recipe : info.recipes) {
+				if (!environment.is_type_stationary(recipe.ingredient1)) {
+					--available_ingredients.at(recipe.ingredient1);
+				}
+				--available_ingredients.at(recipe.ingredient2);
+				auto it = available_ingredients.find(recipe.result);
+				if (it == available_ingredients.end()) {
+					available_ingredients.insert({ recipe.result, 1 });
+				} else {
+					++(it->second);
+				}
+			}
+		}
+		for (const auto& recipe : recipes_in) {
+			if (!environment.is_type_stationary(recipe.ingredient1)) {
+				--available_ingredients.at(recipe.ingredient1);
+			}
+			--available_ingredients.at(recipe.ingredient2);
+			auto it = available_ingredients.find(recipe.result);
+			if (it == available_ingredients.end()) {
+				available_ingredients.insert({ recipe.result, 1 });
+			} else {
+				++(it->second);
+			}
+		}
+		if (!environment.do_ingredients_lead_to_goal(available_ingredients)) {
+			return false;
+		}
+
+
 		return true;
 	}
 

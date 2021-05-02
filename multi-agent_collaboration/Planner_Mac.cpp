@@ -221,7 +221,8 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 			bool inner_probable = false;
 			for (const auto& recipe : info_entry.recipes) {
 				for (const auto& agent : info_entry.combination.get()) {
-					if (recogniser.is_probable_normalised(Goal{ info_entry.combination, recipe }, normalisation_goals, agent)) {
+					bool use_non_probability = agent != planning_agent;
+					if (recogniser.is_probable_normalised(Goal{ info_entry.combination, recipe }, normalisation_goals, agent, use_non_probability)) {
 						inner_probable = true;
 						break;
 					}
@@ -607,6 +608,32 @@ std::optional<Collaboration_Info> Planner_Mac::get_best_permutation(const Agent_
 				auto it = agent_recipes.find(recipe);
 				if (it == agent_recipes.end()) {
 					continue;
+				}
+
+				// Erase ending non-actions (handoff agent excluded)
+				auto action_it = joint_actions.end();
+				--action_it;
+				while (true) {
+					bool valid_action = false;
+					for (size_t j = 0; j < (*action_it).size(); ++j) {
+						if (j == handoff_agent.id) {
+							continue;
+						}
+						if (action_it->get_action(j).is_not_none()) {
+							valid_action = true;
+							break;
+						}
+					}
+					if (valid_action) {
+						break;
+					} else {
+						action_it = joint_actions.erase(action_it);
+						if (joint_actions.empty()) {
+							break;
+						} else {
+							--action_it;
+						}
+					}
 				}
 
 				// Perform new search for one recipe
