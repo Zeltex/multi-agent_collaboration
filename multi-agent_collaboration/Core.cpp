@@ -10,7 +10,7 @@ static std::stringstream buffer;
 
 void set_logging_enabled() {
 	save_to_log = true;
-	buffer.clear();
+	buffer.str(std::string());
 }
 
 void flush_log(const std::string& file_name) {
@@ -18,7 +18,7 @@ void flush_log(const std::string& file_name) {
 	file.open(file_name);
 	file << buffer.str();
 	file.close();
-	buffer.clear();
+	buffer.str(std::string());
 }
 
 void print(Print_Level level, const std::string& msg) {

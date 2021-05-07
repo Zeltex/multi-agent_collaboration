@@ -32,6 +32,8 @@ Planner_Mac::Planner_Mac(Environment environment, Agent_Id planning_agent, const
 }
 
 Action Planner_Mac::get_next_action(const State& state) {
+
+	environment.print_state(state);
 	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, std::string("Time step: ") + std::to_string(time_step) + "\n");
 
 	initialize_reachables(state);
