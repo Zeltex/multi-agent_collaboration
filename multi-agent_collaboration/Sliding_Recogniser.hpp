@@ -7,8 +7,13 @@
 #include <vector>
 
 struct Goal_Entry {
-	Goal_Entry() : probability(EMPTY_PROB), lengths(), 
+	Goal_Entry() : probability(EMPTY_PROB), lengths(),
 		length_prob(EMPTY_PROB), progress_prob(EMPTY_PROB) {};
+
+	Goal_Entry(size_t length, size_t time_step) : probability(EMPTY_PROB), lengths(),
+		length_prob(EMPTY_PROB), progress_prob(EMPTY_PROB) {
+		add(length, time_step);
+	};
 	
 	void add(size_t length, size_t time_step) {
 		if (!time_step == 0) {
@@ -42,7 +47,7 @@ struct Goal_Entry {
 class Sliding_Recogniser : public Recogniser_Method {
 public:
 	Sliding_Recogniser(const Environment& environment, const State& initial_state);
-	void update(const std::vector<Goal_Length>& goal_lengths) override;
+	void update(const std::map<Goal, size_t>& goal_lengths) override;
 	Goal get_goal(Agent_Id agent) override;
 	std::map<Goal, float> get_raw_goals() const override;
 	bool is_probable(Goal goal) const override;
@@ -53,7 +58,7 @@ public:
 
 private:
 
-	void insert(const std::vector<Goal_Length>& goal_lengths);
+	void insert(const std::map<Goal, size_t>& goal_lengths);
 	float update_standard_probabilities(size_t base_window_index);
 	float update_non_probabilities(size_t base_window_index, size_t number_of_agents);
 	void normalise(float max_prob);

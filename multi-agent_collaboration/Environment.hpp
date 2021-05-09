@@ -9,6 +9,7 @@
 #include <optional>
 #include <iostream>
 #include <cassert>
+#include <set>
 
 using Coordinate = std::pair<size_t, size_t> ;
 
@@ -31,7 +32,7 @@ struct Agent_Id {
 		return this->id < other.id;
 	}
 	std::string to_string() const {
-		return std::to_string(id);
+		return id == EMPTY_VAL ? "X" : std::to_string(id);
 	}
 };
 
@@ -65,7 +66,6 @@ enum class Ingredient {
 	CUTTING='x',
 	DELIVERY='y'
 };
-
 struct Recipe {
 	constexpr Recipe(Ingredient ingredient1, Ingredient ingredient2, Ingredient result) :
 		ingredient1(ingredient1), ingredient2(ingredient2), result(result) {};
@@ -89,45 +89,61 @@ struct Recipe {
 	}
 };
 
-struct Recipes {
-	std::vector<Recipe> recipes;
+class Environment;
 
-	std::map<Ingredient, size_t> get_ingredient_counts() const {
-		std::map<Ingredient, size_t> ingredients;
-		get_ingredient_counts(ingredients, recipes);
-		return ingredients;
-	}
-	
-	void get_ingredient_counts(std::map<Ingredient, size_t>& ingredients, const std::vector<Recipe>& recipes) const {
-		for (const auto& recipe : recipes) {
-			// Ingredient 1
-			auto it = ingredients.find(recipe.ingredient1);
-			if (it == ingredients.end()) {
-				ingredients.insert({ recipe.ingredient1, 1 });
-			} else {
-				++(it->second);
-			}
+struct Ingredients {
+	Ingredients() : ingredients() {}
 
-			// Ingredient 2
-			it = ingredients.find(recipe.ingredient2);
-			if (it == ingredients.end()) {
-				ingredients.insert({ recipe.ingredient2, 1 });
-			} else {
-				++(it->second);
-			}
+	void add_ingredients(const std::vector<Recipe>& recipes, const Environment& environment);
+	void add_ingredients(const Recipe& recipe, const Environment& environment);
+	void add_ingredient(const Ingredient& ingredient) {
+		auto it = ingredients.find(ingredient);
+		if (it == ingredients.end()) {
+			ingredients.insert({ ingredient, 1 });
+		} else {
+			++(it->second);
 		}
-
-		//for (const auto& [ingredient, count] : ingredients) {
-		//	if (!environment.is_type_stationary(ingredient)
-		//		&& state.get_count(ingredient) < count) {
-
-		//		is_probable = false;
-		//		break;
-		//	}
-		//}
 	}
 
+	void perform_recipes(const std::vector<Recipe>& recipes, const Environment& environment);
+	void perform_recipe(const Recipe& recipe, const Environment& environment);
+
+	size_t get_count(Ingredient ingredient) const {
+		auto it = ingredients.find(ingredient);
+		return it == ingredients.end() ? 0 : it->second;
+	}
+
+	void clear() {
+		ingredients.clear();
+	}
+
+	std::set<Ingredient> get_types() const {
+		std::set<Ingredient> set;
+		for (const auto& [ingredient, count] : ingredients) {
+			set.insert(ingredient);
+		}
+		return set;
+	}
+
+	bool operator<=(const Ingredients& other) const {
+		for (const auto& [ingredient, count] : ingredients) {
+			if (count > other.get_count(ingredient)) return false;
+		}
+		return true;
+	}
+
+	bool operator>(const Ingredients& other) const {
+		for (const auto& [ingredient, count] : ingredients) {
+			if (count > other.get_count(ingredient)) return true;
+		}
+		return false;
+	}
+private:
+
+	std::map<Ingredient, size_t> ingredients;
 };
+
+
 
 struct Action {
 	Action() : direction(Direction::NONE), agent(EMPTY_VAL) {};
@@ -350,6 +366,14 @@ struct Agent_Combination {
 		if (it != agents.end())	agents.erase(it);
 	}
 
+	std::vector<Agent_Id>::const_iterator begin() const {
+		return agents.begin();
+	}
+
+	std::vector<Agent_Id>::const_iterator end() const {
+		return agents.end();
+	}
+
 private:
 	void generate_pretty_print() {
 		pretty_print = "(";
@@ -371,7 +395,9 @@ public:
 
 	Environment(size_t number_of_agents) :
 		number_of_agents(number_of_agents), goal_names(), agents_initial_positions(), walls(), 
-		cutting_stations(), delivery_stations(), width(), height() {};
+		cutting_stations(), delivery_stations(), width(), height() {
+		load_recipes();
+	};
 
 	bool is_inbound(const Coordinate& coordiante) const;
 	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
@@ -389,12 +415,11 @@ public:
 	void print_state(const State& state) const;
 	void play(State& state) const;
 	Joint_Action convert_to_joint_action(const Action& action, Agent_Id agent) const;
-	bool do_ingredients_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count) const;
+	bool do_ingredients_lead_to_goal(const Ingredients& ingredients_count) const;
 
 	std::vector<Action>			get_actions(Agent_Id agent) const;
 	const std::vector<Recipe>&	get_all_recipes() const;
 	std::vector<Coordinate>		get_coordinates(const State& state, Ingredient ingredient) const;
-	std::vector<Ingredient>		get_goal() const;
 	size_t						get_height() const;
 	std::vector<Joint_Action>	get_joint_actions(const Agent_Combination& agents) const;
 	std::vector<Location>		get_locations(const State& state, Ingredient ingredient) const;
@@ -411,12 +436,11 @@ private:
 	void flip_walls_array();
 	Ingredient goal_name_to_ingredient(const std::string& name) const;
 	std::optional<Ingredient> get_recipe(Ingredient ingredient1, Ingredient ingredient2) const;
-	const std::map<std::pair<Ingredient, Ingredient>, Ingredient>& get_recipes() const;
+	void load_recipes();
 	void check_collisions(const State& state, Joint_Action& joint_action) const;
 	void reset();
 	void calculate_recipes();
-	bool does_recipe_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count,
-		const std::pair<std::pair<Ingredient, Ingredient>, Ingredient>& recipe_in) const;
+	bool does_recipe_lead_to_goal(const Ingredients& ingredients_count, const Recipe& recipe_in) const;
 
 
 
@@ -425,13 +449,15 @@ private:
 
 	size_t number_of_agents;
 	std::vector<std::string> goal_names;
-	std::vector<Ingredient> goal_ingredients;			// TODO - This currently does not support multiple ingredients of same type
+	Ingredients goal_ingredients;
 	std::vector<Coordinate> agents_initial_positions;
 
 	std::vector<std::vector<bool>> walls;
 	std::vector<Coordinate> cutting_stations;
 	std::vector<Coordinate> delivery_stations;
 	std::vector<Recipe> goal_related_recipes;
-	
+
+	std::vector<Recipe> all_recipes;
+	std::map<std::pair<Ingredient, Ingredient>, Ingredient> recipes_map;
 };
 

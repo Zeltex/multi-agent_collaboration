@@ -8,6 +8,38 @@
 
 #include "State.hpp"
 
+void Ingredients::add_ingredients(const std::vector<Recipe>& recipes, const Environment& environment) {
+	for (const auto& recipe : recipes) {
+		add_ingredients(recipe, environment);
+	}
+}
+
+void Ingredients::add_ingredients(const Recipe& recipe, const Environment& environment) {
+	if (!environment.is_type_stationary(recipe.ingredient1)) {
+		add_ingredient(recipe.ingredient1);
+	}
+	add_ingredient(recipe.ingredient2);
+}
+
+void Ingredients::perform_recipes(const std::vector<Recipe>& recipes, const Environment& environment) {
+	for (const auto& recipe : recipes) {
+		perform_recipe(recipe, environment);
+	}
+}
+
+void Ingredients::perform_recipe(const Recipe& recipe, const Environment& environment) {
+	if (!environment.is_type_stationary(recipe.ingredient1)) {
+		--ingredients.at(recipe.ingredient1);
+	}
+	--ingredients.at(recipe.ingredient2);
+	auto it = ingredients.find(recipe.result);
+	if (it == ingredients.end()) {
+		ingredients.insert({ recipe.result, 1 });
+	} else {
+		++(it->second);
+	}
+}
+
 bool Environment::is_inbound(const Coordinate& coordinate) const {
 	return coordinate.first >= 0
 		&& coordinate.second >= 0
@@ -275,7 +307,7 @@ State Environment::load(const std::string& path) {
 		}
 		case 1: { 
 			goal_names.push_back(line);
-			goal_ingredients.push_back(goal_name_to_ingredient(line));
+			goal_ingredients.add_ingredient(goal_name_to_ingredient(line));
 			break; 
 		}
 		case 2: {
@@ -436,8 +468,8 @@ Ingredient Environment::goal_name_to_ingredient(const std::string& name) const {
 	}
 }
 
-const std::map<std::pair<Ingredient, Ingredient>, Ingredient>& Environment::get_recipes() const {
-	static const std::map<std::pair<Ingredient, Ingredient>, Ingredient> recipes = {
+ void Environment::load_recipes() {
+	static const std::map<std::pair<Ingredient, Ingredient>, Ingredient> recipes_raw = {
 	{ {Ingredient::CUTTING, Ingredient::TOMATO}, Ingredient::CHOPPED_TOMATO},
 	{ {Ingredient::CUTTING, Ingredient::LETTUCE}, Ingredient::CHOPPED_LETTUCE},
 
@@ -453,14 +485,18 @@ const std::map<std::pair<Ingredient, Ingredient>, Ingredient>& Environment::get_
 	{ {Ingredient::DELIVERY, Ingredient::PLATED_TOMATO}, Ingredient::DELIVERED_TOMATO},
 	{ {Ingredient::DELIVERY, Ingredient::PLATED_LETTUCE}, Ingredient::DELIVERED_LETTUCE},
 	};
-	return recipes;
+	all_recipes = {};
+	recipes_map = {};
+	for (const auto& recipe : recipes_raw) {
+		all_recipes.push_back({ recipe.first.first, recipe.first.second, recipe.second });
+		recipes_map.insert({ {recipe.first.first, recipe.first.second}, recipe.second });
+	}
 }
 
 // Not a great way to define recipes, but functional for now
 std::optional<Ingredient> Environment::get_recipe(Ingredient ingredient1, Ingredient ingredient2) const {
-	auto& recipes = get_recipes();
-	auto recipe_it = recipes.find({ ingredient1, ingredient2 });
-	if (recipe_it != recipes.end()) {
+	auto recipe_it = recipes_map.find({ ingredient1, ingredient2 });
+	if (recipe_it != recipes_map.end()) {
 		return recipe_it->second;
 	} else {
 		return {};
@@ -482,7 +518,7 @@ std::vector<Recipe> Environment::get_possible_recipes(const State& state) const 
 
 			auto ingredients_count = ingredients_count_in;
 
-			if (does_recipe_lead_to_goal(ingredients_count, { {recipe.ingredient1, recipe.ingredient2}, recipe.result })) {
+			if (does_recipe_lead_to_goal(ingredients_count, recipe)) {
 				possible_recipes.push_back(recipe);
 			}
 		}
@@ -490,56 +526,31 @@ std::vector<Recipe> Environment::get_possible_recipes(const State& state) const 
 	return possible_recipes;
 }
 
-bool Environment::does_recipe_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count_in,
-	const std::pair<std::pair<Ingredient, Ingredient>, Ingredient>& recipe_in) const {
+bool Environment::does_recipe_lead_to_goal(const Ingredients& ingredients_count_in,
+	const Recipe& recipe_in) const {
 
 	// Calculate updated ingredients count
 	auto ingredients_count = ingredients_count_in;
-	if (!is_type_stationary(recipe_in.first.first)) {
-		ingredients_count.at(recipe_in.first.first)--;
-	}
-	ingredients_count.at(recipe_in.first.second)--;
-
-	auto it_result = ingredients_count.find(recipe_in.second);
-	if (it_result == ingredients_count.end()) {
-		ingredients_count.insert({ recipe_in.second, 1 });
-	} else {
-		it_result->second++;
-	}
+	ingredients_count.perform_recipe(recipe_in, *this);
 
 	// Recurse on recipes
 	return do_ingredients_lead_to_goal(ingredients_count);
 }
 
-bool Environment::do_ingredients_lead_to_goal(const std::map<Ingredient, size_t>& ingredients_count) const {
-	// TODO - This currently does not support multiple ingredients of same type
-// Check goal condition
-	bool goal_found = true;
-	for (const auto& goal_ingredient : goal_ingredients) {
-		auto it = ingredients_count.find(goal_ingredient);
-		if (it == ingredients_count.end() || it->second == 0) {
-			goal_found = false;
-			break;
-		}
-	}
-	if (goal_found) {
+bool Environment::do_ingredients_lead_to_goal(const Ingredients& ingredients) const {
+
+	// Check goal condition
+	if (goal_ingredients <= ingredients) {
 		return true;
 	}
 	
-	const auto& recipes = get_recipes();
-	for (const auto& recipe : recipes) {
-		if (!is_type_stationary(recipe.first.first)) {
-			auto it = ingredients_count.find(recipe.first.first);
-			if (it == ingredients_count.end() || it->second == 0) {
-				continue;
-			}
-		}
-		auto it = ingredients_count.find(recipe.first.second);
-		if (it == ingredients_count.end() || it->second == 0) {
+	for (const auto& recipe : all_recipes) {
+		Ingredients recipe_ingredients;
+		recipe_ingredients.add_ingredients(recipe, *this);
+		if (recipe_ingredients > ingredients) {
 			continue;
 		}
-
-		if (does_recipe_lead_to_goal(ingredients_count, recipe)) {
+		if (does_recipe_lead_to_goal(ingredients, recipe)) {
 			return true;
 		}
 	}
@@ -550,15 +561,9 @@ const std::vector<Recipe>& Environment::get_all_recipes() const {
 	return goal_related_recipes;
 }
 
-std::vector<Ingredient> Environment::get_goal() const {
-	return goal_ingredients;
-}
-
 bool Environment::is_done(const State& state) const {
-	for (const auto& item : goal_ingredients) {
-		if (!state.contains_item(item)) return false;
-	}
-	return true;
+	auto state_ingredients = state.get_ingredients_count();
+	return goal_ingredients <= state_ingredients;
 }
 
 Coordinate Environment::move(const Coordinate& coordinate, Direction direction) const {
@@ -644,41 +649,29 @@ void Environment::reset() {
 	walls.clear();
 	cutting_stations.clear();
 	delivery_stations.clear();
+	goal_related_recipes.clear();
 }
 
 
 void Environment::calculate_recipes() {
-	auto& recipes = get_recipes();
 
-	std::map<Ingredient, std::pair<Ingredient, Ingredient>> reversed_recipes;
-	for (const auto& recipe : recipes) {
-		reversed_recipes.insert({ recipe.second, {recipe.first.first, recipe.first.second} });
-	}
-
-	std::set<Ingredient> ingredients;
-	for (const auto& ingredient : goal_ingredients) {
-		ingredients.insert(ingredient);
-	}
-
-
-	bool done = false;
-	while (!done) {
-		auto ingredients_size = ingredients.size();
-		for (const auto& recipe : recipes) {
-			if (ingredients.find(recipe.second) != ingredients.end()) {
-				ingredients.insert(recipe.first.first);
-				ingredients.insert(recipe.first.second);
+	std::set<Ingredient> ingredients = goal_ingredients.get_types();
+	auto ingredients_size = EMPTY_VAL;
+	while (ingredients_size != ingredients.size()) {
+		ingredients_size = ingredients.size();
+		for (const auto& recipe : all_recipes) {
+			if (ingredients.find(recipe.result) != ingredients.end()) {
+				ingredients.insert(recipe.ingredient1);
+				ingredients.insert(recipe.ingredient2);
 			}
-		}
-		if (ingredients_size == ingredients.size()) {
-			break;
 		}
 	}
 
 	std::vector<Recipe> result;
-	for (const auto& recipe : recipes) {
-		if (ingredients.find(recipe.second) != ingredients.end()) {
-			result.push_back({ recipe.first.first, recipe.first.second, recipe.second });
+	for (const auto& recipe : all_recipes) {
+		if (ingredients.find(recipe.ingredient1) != ingredients.end()
+			&& ingredients.find(recipe.ingredient2) != ingredients.end()) {
+			result.push_back(recipe);
 		}
 	}
 	goal_related_recipes = result;

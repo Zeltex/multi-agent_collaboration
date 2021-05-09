@@ -15,21 +15,20 @@ constexpr auto charlie = 0.8;			// Threshold for goal being probable
 Sliding_Recogniser::Sliding_Recogniser(const Environment& environment, const State& initial_state)
 	: Recogniser_Method(environment, initial_state), goals(), time_step(0) {
 	for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
-		Goal goal{ Agent_Combination{ agent }, EMPTY_RECIPE };
+		Goal goal{ agent , EMPTY_RECIPE, EMPTY_VAL };
 		goals.insert({ goal,  {} }); 
 		agents_active_status.emplace_back();
 	}
 }
 
-void Sliding_Recogniser::insert(const std::vector<Goal_Length>& goal_lengths) {
-	for (const auto& entry : goal_lengths) {
-		Goal goal{ entry.agents, entry.recipe };
+void Sliding_Recogniser::insert(const std::map<Goal, size_t>& goal_lengths) {
+	for (const auto& [goal, length] : goal_lengths) {
 		auto it = goals.find(goal);
 		if (it == goals.end()) {
-			bool dummy;
-			std::tie(it, dummy) = goals.insert({ goal, {} });
+			goals.insert({ goal, Goal_Entry{length, time_step} });
+		} else {
+			it->second.add(length, time_step);
 		}
-		it->second.add(entry.length, time_step);
 	}
 }
 
@@ -74,6 +73,8 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 	// Record largest progression/diff towards a single goal/combination
 	for (auto& [goal, goal_entry] : goals) {
 		// Skip irrelevant goals and initial state
+		// TODO - The skip irrelevant part should be replaced by new system which replaces
+		// empty entries with the last non-empty entry
 		if (!goal_entry.is_current(time_step) || time_step == 1) {
 			continue;
 		}
@@ -110,11 +111,12 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 				agents.remove(agent);
 				auto combinations = get_combinations(agents);
 				for (auto& combination : combinations) {
-
-					auto it = goals.find(Goal(combination, goal.recipe));
-					if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob) {
-						is_useful = false;
-						break;
+					for (const auto& handoff_agent : combination.get()) {
+						auto it = goals.find(Goal(combination, goal.recipe, handoff_agent));
+						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob) {
+							is_useful = false;
+							break;
+						}
 					}
 				}
 				if (is_useful) {
@@ -136,6 +138,7 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 			progress_prob = 0.0f;
 		}
 		// Note if previous window was optimal
+		// TODO - May be replaced by new system of replacing empty length entries
 		bool previous_active_status = time_step == 1 ? true : agents_active_status.at(agent).back();
 		
 		// If entire window has been optimal
@@ -150,7 +153,7 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 
 		max_prob = std::max(max_prob, progress_prob);
 
-		Goal goal{ Agent_Combination{ agent }, EMPTY_RECIPE };
+		Goal goal{  agent, EMPTY_RECIPE, EMPTY_VAL};
 		goals.at(goal).probability = progress_prob;
 	}
 
@@ -165,7 +168,7 @@ void Sliding_Recogniser::normalise(float max_prob) {
 
 
 
-void Sliding_Recogniser::update(const std::vector<Goal_Length>& goal_lengths) {
+void Sliding_Recogniser::update(const std::map<Goal, size_t>& goal_lengths) {
 	++time_step;
 	insert(goal_lengths);
 
@@ -256,7 +259,7 @@ bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goa
 
 	// Check none-probability
 	if (use_non_probability) {
-		auto non_prob = goals.at(Goal{ Agent_Combination{agent}, EMPTY_RECIPE });
+		auto non_prob = goals.at(Goal{ agent, EMPTY_RECIPE, EMPTY_VAL });
 		if (non_prob.probability > highest_prob) {
 			highest_prob = non_prob.probability;
 		}

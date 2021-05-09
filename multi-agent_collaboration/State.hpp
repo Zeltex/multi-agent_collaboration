@@ -17,7 +17,7 @@ struct State {
 	std::vector<Coordinate>		get_coordinates(Ingredient ingredient) const;
 	size_t						get_count(Ingredient ingredient) const;
 	std::optional<Ingredient>	get_ingredient_at_position(Coordinate coordinate) const;
-	std::map<Ingredient, size_t>get_ingredients_count() const;
+	Ingredients					get_ingredients_count() const;
 	Coordinate					get_location(Agent_Id agent) const;
 	std::vector<Location>		get_locations(Ingredient ingredient) const;
 	std::vector<Location>		get_non_wall_locations(Ingredient ingredient, const Environment& environment) const;

@@ -31,7 +31,7 @@ struct Solution {
 
 
 
-void solve(Environment& environment) {
+void solve() {
 	//open-divider_salad.txt
 
 	auto paths = get_all_files("../levels/BD/");
@@ -46,6 +46,8 @@ void solve(Environment& environment) {
 	//std::vector<std::string> paths{ "../levels/BD/partial-divider_tomato.txt" };
 	//std::vector<std::string> paths{ "../levels/Test_Scenarios/L1.txt" };
 	//std::vector<std::string> paths{ "../levels/Test_Scenarios/L2.txt" };
+	//std::vector<std::string> paths{ "../levels/Test_Scenarios/L3.txt" };
+	//std::vector<std::string> paths{ "../levels/Test_Scenarios/L4.txt" };
 	
 	std::vector<Solution> solutions;
 
@@ -56,6 +58,7 @@ void solve(Environment& environment) {
 	};
 
 	for (const auto& path : paths) {
+		auto environment = Environment(2);
 		auto state = environment.load(path);
 		size_t action_count = 0;
 		auto time_start = std::chrono::system_clock::now();
@@ -74,7 +77,7 @@ void solve(Environment& environment) {
 		}
 		while (!environment.is_done(state)) {
 			std::vector<Action> actions;
-			environment.print_state(state);
+			//environment.print_state(state);
 			//for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
 			for (auto& planner : planners) {
 				actions.push_back(planner.get_next_action(state));
@@ -102,15 +105,13 @@ void solve(Environment& environment) {
 }
 
 int main(int argc, char* argv[]) {
-	auto environment = Environment(2);
-
-
 	if (PLAY) {
+		auto environment = Environment(2);
 		auto state = environment.load("../levels/BD/partial-divider_salad.txt");
 		environment.print_state(state);
 		environment.play(state);
 	} else {
-		solve(environment);
+		solve();
 	}
 
 	return 0;

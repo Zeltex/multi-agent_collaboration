@@ -14,23 +14,25 @@
 
 struct Action_Path {
 	Action_Path(std::vector<Joint_Action> joint_actions,
-		Recipe recipe,
-		Agent_Combination agents,
-		Agent_Id main_agent,
-		const Coordinate& initial_coordinate,
+		const Goal goal,
+		const State& state,
 		const Environment& environment)
-		: joint_actions(joint_actions), recipe(recipe), agents(agents),
+		: joint_actions(joint_actions), recipe(goal.recipe), agents(goal.agents),
+		handoff_agent(goal.handoff_agent),
 		first_action(EMPTY_VAL), last_action(EMPTY_VAL) {
 
-		if (joint_actions.empty()) {
+		//const auto& handoff_agent = goal.handoff_agent;
+
+		if (joint_actions.empty() || handoff_agent == EMPTY_VAL) {
 			return;
 		}
+		auto initial_coordinate = state.get_agent(handoff_agent).coordinate;
 		
 		// Stop at first action which interacts with a wall
 		first_action = 0;
 		auto coordinate = initial_coordinate;
 		while (true) {
-			coordinate = environment.move_noclip(coordinate, joint_actions.at(first_action).get_action(main_agent).direction);
+			coordinate = environment.move_noclip(coordinate, joint_actions.at(first_action).get_action(handoff_agent).direction);
 			if (environment.is_cell_type(coordinate, Cell_Type::WALL)) {
 				break;
 			}
@@ -47,7 +49,7 @@ struct Action_Path {
 		last_action = EMPTY_VAL;
 		size_t action_counter = 0;
 		while (action_counter < joint_actions.size()) {
-			const auto& direction = joint_actions.at(action_counter).get_action(main_agent).direction;
+			const auto& direction = joint_actions.at(action_counter).get_action(handoff_agent).direction;
 			if (environment.is_cell_type(environment.move_noclip(coordinate, direction), Cell_Type::WALL)) {
 				last_action = action_counter;
 			}
@@ -65,6 +67,10 @@ struct Action_Path {
 	}
 
 	size_t size() const {
+		return joint_actions.size();
+	}
+
+	size_t length() const {
 		return joint_actions.size();
 	}
 
@@ -113,172 +119,139 @@ struct Action_Path {
 	std::string last_action_string() {
 		return last_action == EMPTY_VAL ? "X" : std::to_string(last_action);
 	}
+	
+	//	bool is_valid() const {
+//		return length != 0 && length != EMPTY_VAL;
+//	}
+//	Action action(const Agent_Id& agent) const {
+//		return next_action.get_action(agent);
+//	}
+//	bool has_useful_action(const Agent_Id& agent) const {
+//		for (const auto& action : actions->joint_actions) {
+//			if (action.is_action_non_trivial(agent)) {
+//				return true;
+//			}
+//		}
+//		return false;
+//	}
 
 	std::vector<Joint_Action> joint_actions;
 	Recipe recipe;
 	Agent_Combination agents;
-	size_t first_action;	// First useful action by main_agent
-	size_t last_action;		// Last useful action by main_agent
-};
+	size_t first_action;	// First useful action by handoff_agent
+	size_t last_action;		// Last useful action by handoff_agent
 
-struct Subtask_Info {
-	size_t first_action;
-	size_t last_action;
-	size_t length;
-	Joint_Action next_action;
-	Action_Path* actions;
-	bool is_valid() const {
-		return length != 0 && length != EMPTY_VAL;
-	}
-	Action action(const Agent_Id& agent) const {
-		return next_action.get_action(agent);
-	}
-	bool has_useful_action(const Agent_Id& agent) const {
-		for (const auto& action : actions->joint_actions) {
-			if (action.is_action_non_trivial(agent)) {
-				return true;
-			}
-		}
-		return false;
-	}
-};
-struct Subtask_Entry {
-	Recipe recipe;
-	Agent_Combination agents;
-	bool operator<(const Subtask_Entry& other) const {
-		if (recipe != other.recipe) return recipe < other.recipe;
-		if (agents != other.agents) return agents < other.agents;
-		return false;
-	}
+	Agent_Id handoff_agent;
 };
 
 struct Paths {
-	Paths(size_t number_of_agents) 
-		: normal_paths(), handoff_info(number_of_agents), normal_info(number_of_agents), 
-		handoff_paths(number_of_agents){};
-
-	void insert(const std::vector<Joint_Action>& actions, Recipe recipe,
-		Agent_Combination agents, Agent_Id main_agent,
-		const State& state, const Environment& environment) {
-
-		Coordinate agent_coordinate = state.get_agent(main_agent).coordinate;
-
-		Action_Path temp(actions, recipe, agents, main_agent,
-			agent_coordinate, environment);
-		for (size_t i = 0; i < normal_info.size(); ++i) {
-			normal_info.at(i).insert({
-				Subtask_Entry{recipe, agents},
-				Subtask_Info{temp.first_action, temp.last_action,
-					actions.size(), actions.at(0)} });
-		}
-		normal_paths.insert(temp);
-	}
+	Paths() : handoff_map(), handoff_paths(){};
 	
-	void insert(const std::vector<Joint_Action>& actions, Recipe recipe,
-		Agent_Combination agents, Agent_Id main_agent, Agent_Id handoff_agent,
+	void insert(const std::vector<Joint_Action>& actions, const Goal& goal,
 		const State& state, const Environment& environment) {
 
-		Coordinate agent_coordinate = state.get_agent(main_agent).coordinate;
+		handoff_paths.push_back({ actions, goal, state, environment });
+		Action_Path* path_ptr = &handoff_paths.back();
 
-		// TODO - A little inefficient to create an Action_Path just to get last_action
-		Action_Path action_path(actions, recipe, agents, handoff_agent, 
-			agent_coordinate, environment);
-		handoff_paths.at(handoff_agent.id).push_back(action_path);
-		Action_Path* path_ptr = &handoff_paths.at(handoff_agent.id).back();
-
-		handoff_info.at(handoff_agent.id).insert({ 
-			Subtask_Entry{recipe, agents}, 
-			Subtask_Info{action_path.first_action, action_path.last_action, actions.size(), 
-				actions.at(0), path_ptr} });
+		handoff_map.insert({ goal, path_ptr });
 
 	}
 
-	void update(const std::vector<Joint_Action>& actions, Recipe recipe,
-		Agent_Combination agents, Agent_Id main_agent, Agent_Id handoff_agent,
-		const State& state, const Environment& environment) {
+	void update(const std::vector<Joint_Action>& actions,
+		const Goal& goal, const State& state, const Environment& environment) {
 
-		// Erase info
-		auto& handoff_ref = handoff_info.at(handoff_agent.id);
-		Subtask_Entry entry{ recipe, agents };
-		auto it = handoff_ref.find(entry);
-		if (it != handoff_ref.end()) {
-			handoff_ref.erase(it);
+		auto it = handoff_map.find(goal);
+		if (it == handoff_map.end()) {
+			insert(actions, goal, state, environment);
+		} else {
+			(*it->second) = Action_Path(actions, goal, state, environment);
 		}
-
-		// Erase path
-		auto& handoff_path_ref = handoff_paths.at(handoff_agent.id);
-		for (auto path = handoff_path_ref.begin(); path != handoff_path_ref.end(); ++path) {
-			if (agents == path->agents && recipe == path->recipe) {
-				handoff_path_ref.erase(path);
-				break;
-			}
-		}
-
-		// Insert info and path
-		insert(actions, recipe, agents, main_agent, handoff_agent, state, environment);
-	}
-	
-	const std::set<Action_Path>& get_normal() const { 
-		return normal_paths; 
 	}
 
-	std::optional<const Subtask_Info*> get_handoff(Agent_Id agent, const Subtask_Entry& entry) const { 
-		auto it = handoff_info.at(agent.id).find(entry); 
-		if (it == handoff_info.at(agent.id).end()) {
+	const std::map<Goal, Action_Path*>& get_handoff() const {
+		return handoff_map;
+	}
+
+	std::optional<const Action_Path*> get_handoff(const Goal& goal) const { 
+		auto it = handoff_map.find(goal); 
+		if (it == handoff_map.end()) {
 			return {};
 		} else {
-			return &(it->second);
+			return it->second;
 		}
 	}
 
-	std::optional<const Subtask_Info*> get_normal(Agent_Id agent, const Subtask_Entry& entry) const {
-		auto it = normal_info.at(agent.id).find(entry);
-		if (it == normal_info.at(agent.id).end()) {
-			return {};
-		} else {
-			return &(it->second);
-		}
+	bool empty() const {
+		return handoff_paths.empty();
 	}
+
 private:
-	std::vector<std::deque<Action_Path>> handoff_paths;
-	std::set<Action_Path> normal_paths;
-	std::vector<std::map<Subtask_Entry, Subtask_Info>> handoff_info;
-	std::vector<std::map<Subtask_Entry, Subtask_Info>> normal_info;
+	std::deque<Action_Path> handoff_paths;
+	std::map<Goal, Action_Path*> handoff_map;
 };
 
 struct Collaboration_Info {
 	Collaboration_Info() : length(EMPTY_VAL), 
-		combination(), recipes(), 
-		next_action(), value(EMPTY_VAL), permutation() {};
+		next_action(), value(EMPTY_VAL), goals() {};
 
-	Collaboration_Info(size_t length, Agent_Combination combination, const std::vector<Recipe> recipes,
-		Action next_action, Agent_Combination permutation)
-		: length(length), combination(combination), recipes(recipes), 
-			next_action(next_action), value(EMPTY_VAL), permutation(permutation){};
+	//Collaboration_Info(size_t length, Agent_Combination combination, const std::vector<Recipe> recipes,
+	//	Action next_action, Agent_Combination permutation)
+	//	: length(length), 
+	//		next_action(next_action), value(EMPTY_VAL), goals() {};
+
+	Collaboration_Info(size_t length, const Goals& goals, const Action& next_action)
+		: length(length), goals(goals), next_action(next_action) {}
 
 	std::string to_string() const {
-		std::string result;
-		for (const auto& recipe : recipes) {
-			result += recipe.result_char();
+		if (goals.has_same_agents()) {
+			std::string result;
+			for (const auto& goal : goals.get_iterable()) {
+				result += goal.recipe.result_char();
+			}
+			result += ":" + goals.get_agents().to_string_raw() 
+				+ ":" + goals.get_handoff_string();
+			
+			return result;
+		} else {
+			return "String todo - planner_mac.hpp";
 		}
-		result += ":" + combination.to_string_raw() 
-			+ ":" + permutation.to_string_raw();
-		
-		return result;
 	}
 
 	bool has_value() const {
 		return length != EMPTY_VAL;
 	}
 
-	size_t length;
-	//size_t last_action;
-	Agent_Combination combination;
-	Agent_Combination permutation;
-	std::vector<Recipe> recipes;
-	Action next_action;
+	bool is_only_agent(Agent_Id agent) const {
+		const auto& agents = goals.get_agents();
+		return agents.size() == 1 && *agents.begin() == agent;
+	}
 
+	size_t goals_size() const {
+		return goals.size();
+	}
+
+	size_t agents_size() const {
+		return get_agents().size();
+	}
+
+	const Agent_Combination& get_agents() const {
+		return goals.get_agents();
+	}
+
+	const Goals& get_goals() const {
+		return goals;
+	}
+	
+	const std::vector<Goal>& get_goals_iterable() const {
+		return goals.get_iterable();
+	}
+
+	Action next_action;
+	size_t length;
 	float value;
+	
+private:
+	Goals goals;
 };
 
 struct Recipe_Solution {
@@ -391,9 +364,9 @@ struct Colab_Collection {
 	Colab_Collection() : infos(), tasks(0), value(EMPTY_VAL) {};
 
 	void add(const Collaboration_Info& info) {
-		tasks += info.recipes.size();
+		tasks += info.goals_size();
 		infos.push_back(info);
-		for (const auto& agent : info.combination.get()) {
+		for (const auto& agent : info.get_agents()) {
 			agents.insert(agent);
 		}
 	}
@@ -405,7 +378,7 @@ struct Colab_Collection {
 	bool contains(const Agent_Combination& agent_combination) const {
 		for (const auto& agent : agent_combination.get()) {
 			for (const auto& info : infos) {
-				if (info.combination.contains(agent)) {
+				if (info.get_agents().contains(agent)) {
 					return true;
 				}
 			}
@@ -413,34 +386,34 @@ struct Colab_Collection {
 		return false;
 	}
 
-	bool contains(const std::vector<Recipe>& recipes_in) const {
-		for (const auto& recipe_in : recipes_in) {
-			for (const auto& info : infos) {
-				for (const auto& recipe : info.recipes) {
-					if (recipe_in.result == recipe.result) {
-						return true;
-					}
-				}
-			}
-		}
-		return false;
-	}
+	//bool contains(const std::vector<Recipe>& recipes_in) const {
+	//	for (const auto& recipe_in : recipes_in) {
+	//		for (const auto& info : infos) {
+	//			for (const auto& goal : info.get_goals()) {
+	//				if (recipe_in.result == goal.recipe.result) {
+	//					return true;
+	//				}
+	//			}
+	//		}
+	//	}
+	//	return false;
+	//}
 
-	bool contains(const Recipe& recipe_in) const {
-		for (const auto& info : infos) {
-			for (const auto& recipe : info.recipes) {
-				if (recipe_in.result == recipe.result) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
+	//bool contains(const Recipe& recipe_in) const {
+	//	for (const auto& info : infos) {
+	//		for (const auto& goal : info.get_goals()) {
+	//			if (recipe_in.result == goal.recipe.result) {
+	//				return true;
+	//			}
+	//		}
+	//	}
+	//	return false;
+	//}
 
 	void calculate_value(size_t max_agents) {
 		std::vector<float> values(max_agents, 0);
 		for (const auto& info : infos) {
-			for (const auto& agent : info.combination.get()) {
+			for (const auto& agent : info.get_agents()) {
 				//values.at(agent.id) += info.value * info.recipes.size();
 				values.at(agent.id) += info.value;
 			}
@@ -451,56 +424,32 @@ struct Colab_Collection {
 		}
 	}
 
-	bool is_compatible(const std::vector<Recipe>& recipes_in, 
-		const std::map<Ingredient, size_t>& available_ingredients_in,
+	bool is_compatible(const std::vector<Recipe>& recipes_in,
+		//const std::map<Ingredient, size_t>& available_ingredients_in,
+		const Ingredients& available_ingredients_in,
 		const Environment& environment) const {
 		
 		// Check if enough ingredients are present
-		std::map<Ingredient, size_t> recipe_ingredients;
-		Recipes recipes;
+		Ingredients recipe_ingredients;
 		for (const auto& info : infos) {
-			recipes.get_ingredient_counts(recipe_ingredients, info.recipes);
-		}
-		recipes.get_ingredient_counts(recipe_ingredients, recipes_in);
-		for (const auto& [ingredient, count] : recipe_ingredients) {
-			if (environment.is_type_stationary(ingredient)) continue;
-
-			auto it = available_ingredients_in.find(ingredient);
-			if (it == available_ingredients_in.end()){ 
-				if (count > 0) return false;
-			} else {
-				if (count > it->second) return false;
+			for (const auto& goal : info.get_goals_iterable()) {
+				recipe_ingredients.add_ingredients(goal.recipe, environment);
 			}
+		}
+		recipe_ingredients.add_ingredients(recipes_in, environment);
+
+		if (!(recipe_ingredients <= available_ingredients_in)) {
+			return false;
 		}
 
 		// Check if recipes can still lead to goal
 		auto available_ingredients = available_ingredients_in;
 		for (const auto& info : infos) {
-			for (const auto& recipe : info.recipes) {
-				if (!environment.is_type_stationary(recipe.ingredient1)) {
-					--available_ingredients.at(recipe.ingredient1);
-				}
-				--available_ingredients.at(recipe.ingredient2);
-				auto it = available_ingredients.find(recipe.result);
-				if (it == available_ingredients.end()) {
-					available_ingredients.insert({ recipe.result, 1 });
-				} else {
-					++(it->second);
-				}
+			for (const auto& goal : info.get_goals_iterable()) {
+				available_ingredients.perform_recipe(goal.recipe, environment);
 			}
 		}
-		for (const auto& recipe : recipes_in) {
-			if (!environment.is_type_stationary(recipe.ingredient1)) {
-				--available_ingredients.at(recipe.ingredient1);
-			}
-			--available_ingredients.at(recipe.ingredient2);
-			auto it = available_ingredients.find(recipe.result);
-			if (it == available_ingredients.end()) {
-				available_ingredients.insert({ recipe.result, 1 });
-			} else {
-				++(it->second);
-			}
-		}
+		available_ingredients.perform_recipes(recipes_in, environment);
 		if (!environment.do_ingredients_lead_to_goal(available_ingredients)) {
 			return false;
 		}
@@ -557,9 +506,8 @@ private:
 		std::vector<Collaboration_Info>::const_iterator it_in,
 		const std::map<Ingredient, size_t>& available_ingredients);
 
-	std::optional<Collaboration_Info> get_best_permutation(const Agent_Combination& agents, 
-		const std::vector<Recipe>& recipes, const Paths& paths,
-		const std::vector<std::vector<Agent_Id>>& agent_permutations,
+	std::optional<Collaboration_Info> get_best_permutation(const Goals& goals, 
+		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
 		const State& state);
 
 	bool is_conflict_in_permutation(const State& initial_state, 
@@ -570,34 +518,34 @@ private:
 		const size_t& best_length);
 
 	std::pair<std::vector<Joint_Action>, std::map<Recipe, Agent_Combination>> get_actions_from_permutation(
-		const Agent_Combination& permutation, const std::vector<Action_Path>& action_paths, size_t agent_size,
-		const State& state);
+		const Goals& goals, const Paths& paths, size_t agent_size, const State& state);
 
-	std::pair<std::vector<Action>, Recipe> get_actions_from_permutation_inner(
-		const Agent_Combination& permutation, const Agent_Id& acting_agent,
-		const std::vector<Action_Path>& action_paths, size_t action_trace_length,
-		const State& state);
+	std::pair<std::vector<Action>, Recipe> get_actions_from_permutation_inner(const Goals& goals,
+		const Agent_Id& acting_agent, const Paths& paths, const State& state);
 
 	std::vector<std::set<Temp>> get_agent_handoff_infos( 
 		const Agent_Combination& agents, const std::vector<Agent_Id>& agent_permutation, 
 		const std::vector<Action_Path>& action_paths);
 	std::vector<size_t> calculate_adjusted_agent_handoffs(std::vector<std::set<Temp>>& agents_handoffs);
 
-	size_t get_permutation_length(const Agent_Combination& agents,
-		const std::vector<Agent_Id>& agent_permutation, const std::vector<Action_Path>& action_paths);
+	size_t get_permutation_length(const Goals& goals, const Paths& paths);
 
-	std::optional<std::vector<Action_Path>> get_permutation_action_paths(const Agent_Combination& agents,
-		const std::vector<Recipe>& recipes, const Paths& paths, const std::vector<Agent_Id>& agent_permutation) const;
+	std::optional<std::vector<Action_Path>> get_permutation_action_paths(const Goals& goals,
+		const Paths& paths) const;
 
-	bool is_agent_abused(const std::vector<Agent_Id>& agent_permutation, const std::vector<Action_Path>& action_paths) const;
+	bool is_agent_abused(const Goals& goals, const Paths& paths) const;
 
-	std::map<Multi_Goal, float> calculate_goal_values(std::vector<Collaboration_Info>& infos);
+	std::map<Goals, float> calculate_goal_values(std::vector<Collaboration_Info>& infos);
 
 	std::vector<Collaboration_Info> calculate_probable_multi_goals(const std::vector<Collaboration_Info>& infos,
-		const std::map<Multi_Goal, float>& goal_values, const State& state);
+		const std::map<Goals, float>& goal_values, const State& state);
 
 	std::vector<Collaboration_Info> calculate_infos(const Paths& paths, const std::vector<Recipe>& recipes_in,
 		const State& state);
+
+	void trim_trailing_non_actions(std::vector<Joint_Action>& joint_actions, const Agent_Id& handoff_agent);
+
+	Paths perform_new_search(const State& state, const Goal& goal, const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents);
 
 	Recogniser recogniser;
 	Search search;
