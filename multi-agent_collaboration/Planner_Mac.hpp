@@ -424,7 +424,7 @@ struct Colab_Collection {
 		}
 	}
 
-	bool is_compatible(const std::vector<Recipe>& recipes_in,
+	bool is_compatible(const Goals& goals_in,
 		//const std::map<Ingredient, size_t>& available_ingredients_in,
 		const Ingredients& available_ingredients_in,
 		const Environment& environment) const {
@@ -436,7 +436,9 @@ struct Colab_Collection {
 				recipe_ingredients.add_ingredients(goal.recipe, environment);
 			}
 		}
-		recipe_ingredients.add_ingredients(recipes_in, environment);
+		for (const auto& goal : goals_in.get_iterable()) {
+			recipe_ingredients.add_ingredients(goal.recipe, environment);
+		}
 
 		if (!(recipe_ingredients <= available_ingredients_in)) {
 			return false;
@@ -449,7 +451,10 @@ struct Colab_Collection {
 				available_ingredients.perform_recipe(goal.recipe, environment);
 			}
 		}
-		available_ingredients.perform_recipes(recipes_in, environment);
+
+		for (const auto& goal : goals_in.get_iterable()) {
+			available_ingredients.perform_recipe(goal.recipe, environment);
+		}
 		if (!environment.do_ingredients_lead_to_goal(available_ingredients)) {
 			return false;
 		}
@@ -504,9 +509,13 @@ private:
 	Colab_Collection get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
 		const size_t& max_tasks, const size_t& max_agents, Colab_Collection collection,
 		std::vector<Collaboration_Info>::const_iterator it_in,
-		const std::map<Ingredient, size_t>& available_ingredients);
+		const Ingredients& available_ingredients);
 
 	std::optional<Collaboration_Info> get_best_permutation(const Goals& goals, 
+		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
+		const State& state);
+
+	std::vector<Collaboration_Info> get_collaboration_permutations(const Goals& goals,
 		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
 		const State& state);
 

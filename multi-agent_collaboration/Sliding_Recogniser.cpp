@@ -291,7 +291,11 @@ float Sliding_Recogniser::get_probability(const Goal& goal) const {
 void Sliding_Recogniser::print_probabilities() const {
 	for (const auto& [key, val] : goals) {
 		if (!val.is_current(time_step)) continue;
-		PRINT(Print_Category::RECOGNISER, Print_Level::DEBUG, static_cast<char>(key.recipe.result) + key.agents.to_string() + "\t");
+		PRINT(Print_Category::RECOGNISER, Print_Level::DEBUG, 
+			static_cast<char>(key.recipe.result) + 
+			key.agents.to_string() + 
+			key.handoff_agent.to_string() + 
+			"\t");
 	}
 
 	std::vector<std::stringstream> buffers(3);
