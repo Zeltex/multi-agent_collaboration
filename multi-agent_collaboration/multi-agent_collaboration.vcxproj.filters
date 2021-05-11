@@ -1,0 +1,132 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\environment">
+      <UniqueIdentifier>{d8fbf4a5-5194-42bc-a36a-c1cc0dd0c1ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\environment">
+      <UniqueIdentifier>{cb8ed0c1-ccd1-4b57-b51f-bdae2bf510d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\planner">
+      <UniqueIdentifier>{529be734-82e0-4424-b8c1-9b03399fd326}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\planner">
+      <UniqueIdentifier>{497ec52d-c022-45fb-8ced-fde148c67503}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\search">
+      <UniqueIdentifier>{5f5e88cf-037b-4697-bca5-88d6fe6efea2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\search">
+      <UniqueIdentifier>{83d472fd-b584-4bd1-82a7-efa7d359c718}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\goal_recognition">
+      <UniqueIdentifier>{3721f62f-f29d-43fb-9b79-07c76879a538}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Goal_Recognition">
+      <UniqueIdentifier>{bacbc911-f959-4492-9bf4-8789934d22fe}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Environment.hpp">
+      <Filter>Header Files\environment</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Planner_Mac.hpp">
+      <Filter>Header Files\planner</Filter>
+    </ClInclude>
+    <ClInclude Include="BFS.hpp">
+      <Filter>Header Files\search</Filter>
+    </ClInclude>
+    <ClInclude Include="A_Star.hpp">
+      <Filter>Header Files\search</Filter>
+    </ClInclude>
+    <ClInclude Include="Search.hpp">
+      <Filter>Header Files\search</Filter>
+    </ClInclude>
+    <ClInclude Include="Search_Trimmer.hpp">
+      <Filter>Header Files\search</Filter>
+    </ClInclude>
+    <ClInclude Include="Search.ipp">
+      <Filter>Header Files\search</Filter>
+    </ClInclude>
+    <ClInclude Include="State.hpp">
+      <Filter>Header Files\environment</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Heuristic.hpp">
+      <Filter>Header Files\search</Filter>
+    </ClInclude>
+    <ClInclude Include="Recogniser.hpp">
+      <Filter>Header Files\goal_recognition</Filter>
+    </ClInclude>
+    <ClInclude Include="Bayesian_Recogniser.hpp">
+      <Filter>Header Files\goal_recognition</Filter>
+    </ClInclude>
+    <ClInclude Include="Sliding_Recogniser.hpp">
+      <Filter>Header Files\goal_recognition</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils.ipp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Planner.hpp">
+      <Filter>Header Files\planner</Filter>
+    </ClInclude>
+    <ClInclude Include="Planner_Still.hpp">
+      <Filter>Header Files\planner</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Environment.cpp">
+      <Filter>Source Files\environment</Filter>
+    </ClCompile>
+    <ClCompile Include="Core.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Planner_Mac.cpp">
+      <Filter>Source Files\planner</Filter>
+    </ClCompile>
+    <ClCompile Include="BFS.cpp">
+      <Filter>Source Files\search</Filter>
+    </ClCompile>
+    <ClCompile Include="A_Star.cpp">
+      <Filter>Source Files\search</Filter>
+    </ClCompile>
+    <ClCompile Include="Search_Trimmer.cpp">
+      <Filter>Source Files\search</Filter>
+    </ClCompile>
+    <ClCompile Include="State.cpp">
+      <Filter>Source Files\environment</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Heuristic.cpp">
+      <Filter>Source Files\search</Filter>
+    </ClCompile>
+    <ClCompile Include="Bayesian_Recogniser.cpp">
+      <Filter>Source Files\Goal_Recognition</Filter>
+    </ClCompile>
+    <ClCompile Include="Sliding_Recogniser.cpp">
+      <Filter>Source Files\Goal_Recognition</Filter>
+    </ClCompile>
+    <ClCompile Include="Planner_Still.cpp">
+      <Filter>Source Files\planner</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

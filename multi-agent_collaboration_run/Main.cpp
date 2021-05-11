@@ -77,7 +77,7 @@ void solve() {
 		}
 		while (!environment.is_done(state)) {
 			std::vector<Action> actions;
-			//environment.print_state(state);
+			environment.print_state(state);
 			//for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
 			for (auto& planner : planners) {
 				actions.push_back(planner.get_next_action(state));
