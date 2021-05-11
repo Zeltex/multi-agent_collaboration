@@ -111,7 +111,9 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 				agents.remove(agent);
 				auto combinations = get_combinations(agents);
 				for (auto& combination : combinations) {
-					for (const auto& handoff_agent : combination.get()) {
+					auto possible_handoff_agents = combination.get();
+					possible_handoff_agents.push_back(EMPTY_VAL);
+					for (const auto& handoff_agent : possible_handoff_agents) {
 						auto it = goals.find(Goal(combination, goal.recipe, handoff_agent));
 						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob) {
 							is_useful = false;

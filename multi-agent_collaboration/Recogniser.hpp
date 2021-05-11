@@ -140,6 +140,12 @@ struct Goals {
 		return result;
 	}
 
+	void clear_all_handoff_indices() {
+		for (auto& goal : goals) {
+			goal.handoff_agent = EMPTY_VAL;
+		}
+	}
+
 private:
 	bool same_agents;		 // If all goals contain same agents
 	std::vector<Goal> goals;

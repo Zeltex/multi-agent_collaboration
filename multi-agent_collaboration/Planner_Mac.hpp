@@ -582,6 +582,8 @@ private:
 
 	Paths perform_new_search(const State& state, const Goal& goal, const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents);
 
+	bool is_agent_subset_faster(const Collaboration_Info& info, const std::map<Goals, float>& goal_values);
+
 	Recogniser recogniser;
 	Search search;
 	std::map<Agent_Combination, Reachables> agent_reachables;

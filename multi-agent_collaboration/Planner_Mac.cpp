@@ -179,17 +179,8 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 			//	is_probable &= task_faster_coop;
 			//}
 			
-			// Check if a subset of the agents can solve all task at least as fast
-			auto combinations = get_combinations<Agent_Id>(info_entry.get_agents().get(), info_entry.agents_size() - 1);
-			for (const auto& combination : combinations) {
-				Goals goals_reduced_agents(info_entry.get_goals(), Agent_Combination{ combination });
-				auto it = goal_values.find(goals_reduced_agents);
-				if (it != goal_values.end()) {
-					if (it->second <= info_entry.value) {
-						is_probable = false;
-						break;
-					}
-				}
+			if (is_agent_subset_faster(info_entry, goal_values)) {
+				is_probable = false;
 			}
 
 			// If recipes in combination are mutually exclusive, then not probable
@@ -248,12 +239,35 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 	return result_infos;
 }
 
+bool Planner_Mac::is_agent_subset_faster(const Collaboration_Info& info, const std::map<Goals, float>& goal_values) {
+	auto combinations = get_combinations<Agent_Id>(info.get_agents().get(), info.agents_size() - 1);
+	for (const auto& combination : combinations) {
+		Goals goals_reduced_agents(info.get_goals(), Agent_Combination{ combination });
+		goals_reduced_agents.clear_all_handoff_indices();
+		auto it = goal_values.find(goals_reduced_agents);
+		if (it != goal_values.end()) {
+			if (it->second <= info.value) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 std::map<Goals, float> Planner_Mac::calculate_goal_values(std::vector<Collaboration_Info>& infos) {
 	std::map<Goals, float> goal_values;
 	for (auto& entry : infos) {
 		auto penalty = std::pow(GAMMA, entry.agents_size() - entry.goals_size());
 		entry.value = (penalty * entry.length) / entry.goals_size();
-		goal_values.insert({ entry.get_goals(), entry.value });
+
+		auto goals = entry.get_goals();
+		goals.clear_all_handoff_indices();
+		auto it = goal_values.find(goals);
+		if (it != goal_values.end()) {
+			it->second = std::min(it->second, entry.value);
+		} else {
+			goal_values.insert({ goals, entry.value });
+		}
 	}
 	return goal_values;
 }
