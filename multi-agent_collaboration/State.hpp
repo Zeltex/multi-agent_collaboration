@@ -21,6 +21,7 @@ struct State {
 	Coordinate					get_location(Agent_Id agent) const;
 	std::vector<Location>		get_locations(Ingredient ingredient) const;
 	std::vector<Location>		get_non_wall_locations(Ingredient ingredient, const Environment& environment) const;
+	bool						is_wall_occupied(const Coordinate& coord) const;
 	bool						items_hoarded(const Recipe& recipe, const Agent_Combination& available_agents) const;
 	void						print_compact() const;
 	void						purge(const Agent_Combination& agents);

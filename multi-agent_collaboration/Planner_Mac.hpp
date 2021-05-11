@@ -146,13 +146,23 @@ struct Action_Path {
 
 struct Paths {
 	Paths() : handoff_map(), handoff_paths(){};
+
+	Paths(const Paths& other) {
+		for (const auto& [goal, path_ptr] : other.handoff_map) {
+			this->insert(goal, *path_ptr);
+		}
+	}
+
+	void insert(const Goal& goal, const Action_Path& path) {
+		handoff_paths.push_back(path);
+		handoff_map.insert({ goal, &handoff_paths.back() });
+	}
 	
 	void insert(const std::vector<Joint_Action>& actions, const Goal& goal,
 		const State& state, const Environment& environment) {
 
 		handoff_paths.push_back({ actions, goal, state, environment });
 		Action_Path* path_ptr = &handoff_paths.back();
-
 		handoff_map.insert({ goal, path_ptr });
 
 	}
@@ -425,9 +435,25 @@ struct Colab_Collection {
 	}
 
 	bool is_compatible(const Goals& goals_in,
-		//const std::map<Ingredient, size_t>& available_ingredients_in,
 		const Ingredients& available_ingredients_in,
 		const Environment& environment) const {
+
+		// Check if new goals contains at least 1 unassigned agent
+		bool found_unassigned_agent = false;
+		for (const auto& goal : goals_in) {
+			for (const auto& agent : goal.agents) {
+				if (agents.find(agent) == agents.end()) {
+					found_unassigned_agent = true;
+					break;
+				}
+			}
+			if (found_unassigned_agent) {
+				break;
+			}
+		}
+		if (!found_unassigned_agent) {
+			return false;
+		}
 		
 		// Check if enough ingredients are present
 		Ingredients recipe_ingredients;
@@ -507,7 +533,7 @@ private:
 	Collaboration_Info get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
 		const size_t& max_tasks, const State& state);
 	Colab_Collection get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
-		const size_t& max_tasks, const size_t& max_agents, Colab_Collection collection,
+		const size_t& max_tasks, const size_t& max_agents, const Colab_Collection& collection,
 		std::vector<Collaboration_Info>::const_iterator it_in,
 		const Ingredients& available_ingredients);
 

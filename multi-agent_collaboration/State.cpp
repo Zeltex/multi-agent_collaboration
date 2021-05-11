@@ -73,6 +73,10 @@ Ingredients State::get_ingredients_count() const {
 	return ingredients;
 }
 
+bool State::is_wall_occupied(const Coordinate& coord) const {
+	return items.find(coord) != items.end();
+}
+
 bool State::items_hoarded(const Recipe& recipe, const Agent_Combination& available_agents) const {
 	std::vector<Ingredient> items_needed{ recipe.ingredient1, recipe.ingredient2 };
 	for (const auto& item : items) {
