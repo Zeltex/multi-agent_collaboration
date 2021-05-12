@@ -437,7 +437,7 @@ private:
 	Ingredient goal_name_to_ingredient(const std::string& name) const;
 	std::optional<Ingredient> get_recipe(Ingredient ingredient1, Ingredient ingredient2) const;
 	void load_recipes();
-	void check_collisions(const State& state, Joint_Action& joint_action) const;
+	bool contains_collisions(const State& state, Joint_Action& joint_action) const;
 	void reset();
 	void calculate_recipes();
 	bool does_recipe_lead_to_goal(const Ingredients& ingredients_count, const Recipe& recipe_in) const;

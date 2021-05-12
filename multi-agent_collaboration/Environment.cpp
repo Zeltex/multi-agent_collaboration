@@ -85,12 +85,15 @@ bool Environment::act(State& state, const Joint_Action& action) const {
 
 bool Environment::act(State& state, const Joint_Action& joint_action, Print_Level print_level) const {
 	auto temp_action = joint_action; // Need to modify the action, potentially take non-const as argument instead
-	check_collisions(state, temp_action);
-	bool valid_action = false;
-	for (const auto& action : temp_action.actions) {
-		valid_action |= act(state, action, print_level);
+	if (contains_collisions(state, temp_action)) {
+		return false;
 	}
-	return valid_action;
+	for (const auto& action : temp_action.actions) {
+		if (!act(state, action, print_level)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 bool Environment::act(State& state, const Action& action) const {
@@ -99,7 +102,7 @@ bool Environment::act(State& state, const Action& action) const {
 
 bool Environment::act(State& state, const Action& action, Print_Level print_level) const {
 	if (action.direction == Direction::NONE) {
-		return false;
+		return true;
 	}
 
 	auto& agent = state.agents.at(action.agent.id);
@@ -184,7 +187,7 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 
 // This collision check is basically a one to one from the BD, but I believe it allows two agents to collide if one is no'opping, need to check this
 // UPDATE: the original code did allow collision with stationary agents, changed it to disallow this even though I believe that BD allows it
-void Environment::check_collisions(const State& state, Joint_Action& joint_action) const {
+bool Environment::contains_collisions(const State& state, Joint_Action& joint_action) const {
 	std::vector<Coordinate> current_coordinates;
 	std::vector<Coordinate> next_coordinates;
 	std::vector<Coordinate> action_coordinates;
@@ -227,11 +230,10 @@ void Environment::check_collisions(const State& state, Joint_Action& joint_actio
 			}
 		}
 	}
-
-	for (const auto& agent : cancelled_agents) {
-		joint_action.actions.at(agent).direction = Direction::NONE;
-	}
-
+	return !cancelled_agents.empty();
+	//for (const auto& agent : cancelled_agents) {
+	//	joint_action.actions.at(agent).direction = Direction::NONE;
+	//}
 }
 
 std::vector<Action> Environment::get_actions(Agent_Id agent) const {
