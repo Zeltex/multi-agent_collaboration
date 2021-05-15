@@ -517,7 +517,7 @@ class Planner_Mac : public Planner_Impl {
 
 public:
 	Planner_Mac(Environment environment, Agent_Id agent, const State& initial_state);
-	virtual Action get_next_action(const State& state) override;
+	virtual Action get_next_action(const State& state, bool print_state) override;
 
 private:
 	Paths get_all_paths(const std::vector<Recipe>& recipes, const State& state);

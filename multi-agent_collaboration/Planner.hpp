@@ -11,7 +11,7 @@ class Planner_Impl {
 public:
 	Planner_Impl(Environment environment, Agent_Id planning_agent)
 		: environment(environment), planning_agent(planning_agent) {}
-	virtual Action get_next_action(const State& state) = 0;
+	virtual Action get_next_action(const State& state, bool print_state) = 0;
 protected:
 	Environment environment;
 	Agent_Id planning_agent;
@@ -22,8 +22,8 @@ public:
 	// TODO - Probably delete copy constructor and more
 	Planner(std::unique_ptr<Planner_Impl> planner_impl) : planner_impl(std::move(planner_impl)) {};
 
-	Action get_next_action(const State& state) {
-		return planner_impl->get_next_action(state);
+	Action get_next_action(const State& state, bool print_state = false) {
+		return planner_impl->get_next_action(state, print_state);
 	}
 
 private:

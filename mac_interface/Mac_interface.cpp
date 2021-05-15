@@ -152,7 +152,7 @@ PyObject* mac_get_next_action(PyObject*, PyObject* o) {
     //    return action_mac_to_bd({ fixed_actions.at(time_step), agent_id });
     //}
 
-    auto action = planner.get_next_action(state);
+    auto action = planner.get_next_action(state, true);
     return action_mac_to_bd(action);
 }
 
