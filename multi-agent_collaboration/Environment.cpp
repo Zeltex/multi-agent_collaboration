@@ -129,6 +129,8 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 				return true;
 			}
 		}
+		// Turns out it is always allowed to hump the delivery station
+		return true;
 
 	// Combine
 	} else if (item_new_position.has_value() && item_old_position.has_value()) {
