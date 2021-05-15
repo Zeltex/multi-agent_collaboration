@@ -219,7 +219,7 @@ bool Environment::contains_collisions(const State& state, Joint_Action& joint_ac
 				}
 			// Swap (invalid)
 			} else if (current_coordinates.at(agent1) == next_coordinates.at(agent2) 
-				&& current_coordinates.at(agent2) == next_coordinates.at(agent1)) {
+				|| current_coordinates.at(agent2) == next_coordinates.at(agent1)) {
 				cancelled_agents.insert(agent1);
 				cancelled_agents.insert(agent2);
 
