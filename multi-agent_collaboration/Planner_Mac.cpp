@@ -218,7 +218,7 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 				for (const auto& agent : goal.agents) {
 					//bool use_non_probability = agent != planning_agent;
 					bool use_non_probability = (agent != planning_agent || info_entry.goals_size() > 1);
-					if (recogniser.is_probable_normalised(goal, normalisation_goals, agent, use_non_probability)) {
+					if (recogniser.is_probable_normalised(goal, normalisation_goals, agent, planning_agent, use_non_probability)) {
 						inner_probable = true;
 						break;
 					}

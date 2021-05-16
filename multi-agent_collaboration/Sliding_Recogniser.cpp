@@ -264,7 +264,7 @@ float Sliding_Recogniser::get_non_probability(Agent_Id agent) const {
 	return goals.at(Goal(agent, EMPTY_RECIPE, EMPTY_VAL)).probability;
 }
 
-bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id agent, bool use_non_probability) const {
+bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id acting_agent, Agent_Id planning_agent, bool use_non_probability) const {
 	float highest_prob = 0.0f;
 	auto it = goals.find(goal);
 	if (it == goals.end()) {
@@ -273,14 +273,14 @@ bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goa
 
 	// Combinations including idle agents are improbable by default
 	for (const auto& agent : goal.agents) {
-		if (get_non_probability(agent) == 1.0) {
+		if (agent != planning_agent && get_non_probability(agent) == 1.0) {
 			return false;
 		}
 	}
 	
 
 	for (const auto& goal : available_goals) {
-		if (!goal.agents.contains(agent)) {
+		if (!goal.agents.contains(acting_agent)) {
 			continue;
 		}
 		auto inner_it = goals.find(goal);
@@ -291,7 +291,7 @@ bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goa
 
 	// Check none-probability
 	if (use_non_probability) {
-		auto non_prob = get_non_probability(agent);
+		auto non_prob = get_non_probability(acting_agent);
 		if (non_prob > highest_prob) {
 			highest_prob = non_prob;
 		}
@@ -311,7 +311,7 @@ bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goa
 		<< "/"
 		<< goal.handoff_agent.to_string()
 		<< ":" 
-		<< agent.id 
+		<< acting_agent.id 
 		<< " = " 
 		<< normalised_prob 
 		<< "\n";
