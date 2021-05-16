@@ -8,7 +8,7 @@ public:
 	Planner_Still(Environment environment, Agent_Id agent, const State& initial_state)
 		:Planner_Impl(environment, agent) {}
 
-	virtual Action get_next_action(const State& state) override {
+	virtual Action get_next_action(const State& state, bool print_state) override {
 		return { Direction::NONE, planning_agent };
 	}
 

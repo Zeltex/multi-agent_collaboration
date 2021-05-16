@@ -167,17 +167,22 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 		if (info_entry.agents_size() > 1) {
 
 			// If collaborating on multiple tasks, check if all tasks could be done faster seperately
-			//if (info_entry.goals_size() > 1) {
-			//	bool task_faster_coop = false;
-			//	for (auto& goal : info_entry.get_goals_iterable()) {
-			//		auto it_seperate = goal_values.find(Goals( goal ));
-			//		assert(it_seperate != goal_values.end());
-			//		if (it_seperate->second > info_entry.value) {
-			//			task_faster_coop = true;
-			//		}
-			//	}
-			//	is_probable &= task_faster_coop;
-			//}
+			if (info_entry.goals_size() > 1) {
+				bool task_faster_coop = false;
+				for (const auto& goal : info_entry.get_goals_iterable()) {
+
+
+					Goals goals_reduced_agents(goal);
+					goals_reduced_agents.clear_all_handoff_indices();
+
+					auto it_seperate = goal_values.find(goals_reduced_agents);
+					//assert(it_seperate != goal_values.end());
+					if (it_seperate->second > info_entry.value) {
+						task_faster_coop = true;
+					}
+				}
+				is_probable &= task_faster_coop;
+			}
 			
 			if (is_agent_subset_faster(info_entry, goal_values)) {
 				is_probable = false;
@@ -211,7 +216,8 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 			bool inner_probable = false;
 			for (const auto& goal : info_entry.get_goals_iterable()) {
 				for (const auto& agent : goal.agents) {
-					bool use_non_probability = agent != planning_agent;
+					//bool use_non_probability = agent != planning_agent;
+					bool use_non_probability = (agent != planning_agent || info_entry.goals_size() > 1);
 					if (recogniser.is_probable_normalised(goal, normalisation_goals, agent, use_non_probability)) {
 						inner_probable = true;
 						break;
@@ -502,10 +508,11 @@ bool Planner_Mac::is_agent_abused(const Goals& goals, const Paths& paths) const 
 			return false;
 		}
 
-		auto path = paths.get_handoff(goal);
-		if (path.has_value() && path.value()->last_action != EMPTY_VAL) {
-			return false;
-		}
+		// Trying out disallowing any collection with the same handoff on all tasks
+		//auto path = paths.get_handoff(goal);
+		//if (path.has_value() && path.value()->last_action != EMPTY_VAL) {
+		//	return false;
+		//}
 	}
 	return true;
 }

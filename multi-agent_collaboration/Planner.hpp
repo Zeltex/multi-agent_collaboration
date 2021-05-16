@@ -3,8 +3,8 @@
 #include "Environment.hpp"
 
 enum class Planner_Types {
-	MAC,
-	STILL
+	MAC='m',
+	STILL='s'
 };
 
 class Planner_Impl {

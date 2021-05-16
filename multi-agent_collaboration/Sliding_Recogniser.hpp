@@ -57,7 +57,7 @@ public:
 	float get_probability(const Goal& goal) const override;
 
 private:
-
+	float get_non_probability(Agent_Id agent) const;
 	void insert(const std::map<Goal, size_t>& goal_lengths);
 	float update_standard_probabilities(size_t base_window_index);
 	float update_non_probabilities(size_t base_window_index, size_t number_of_agents);
