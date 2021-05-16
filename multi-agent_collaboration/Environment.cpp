@@ -40,6 +40,12 @@ void Ingredients::perform_recipe(const Recipe& recipe, const Environment& enviro
 	}
 }
 
+bool Ingredients::have_ingredients(const Recipe& recipe, const Environment& environment) const {
+	return (environment.is_type_stationary(recipe.ingredient1)
+				|| get_count(recipe.ingredient1) > 0)
+			&& get_count(recipe.ingredient2) > 0;
+}
+
 bool Environment::is_inbound(const Coordinate& coordinate) const {
 	return coordinate.first >= 0
 		&& coordinate.second >= 0

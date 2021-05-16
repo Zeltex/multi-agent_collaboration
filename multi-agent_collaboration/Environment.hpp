@@ -107,6 +107,7 @@ struct Ingredients {
 
 	void perform_recipes(const std::vector<Recipe>& recipes, const Environment& environment);
 	void perform_recipe(const Recipe& recipe, const Environment& environment);
+	bool have_ingredients(const Recipe& recipe, const Environment& environment) const;
 
 	size_t get_count(Ingredient ingredient) const {
 		auto it = ingredients.find(ingredient);

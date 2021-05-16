@@ -881,18 +881,46 @@ void Planner_Mac::trim_trailing_non_actions(std::vector<Joint_Action>& joint_act
 Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
 	const size_t& max_tasks, const State& state) {
 
-	size_t max_agents = environment.get_number_of_agents();
+	auto infos_copy = infos;
+	std::sort(infos_copy.begin(), infos_copy.end(), [](const Collaboration_Info& lhs, const Collaboration_Info& rhs) {
+		return lhs.value < rhs.value;
+		});
 
-	// TODO - Should sort of infos which are not probable
-	auto collection = get_best_collaboration_rec(infos, max_tasks, max_agents, Colab_Collection{}, 
-		infos.begin(), state.get_ingredients_count());
-	Collaboration_Info best_info;
-	for (const auto& info : collection.infos) {
-		if (info.get_agents().contains(planning_agent) && info.value < best_info.value) {
-			best_info = info;
+	auto ingredients = state.get_ingredients_count();
+	for (const auto& info : infos_copy) {
+		bool ingredients_available = true;
+		auto new_ingredients = ingredients;
+		for (const auto& goal : info.get_goals()) {
+			if (!new_ingredients.have_ingredients(goal.recipe, environment)) {
+				ingredients_available = false;
+				break;
+			} else {
+				new_ingredients.perform_recipe(goal.recipe, environment);
+			}
+		}
+		if (ingredients_available) {
+			ingredients = new_ingredients;
+			if (info.get_agents().contains(planning_agent)) return info;
+		} else {
+			continue;
 		}
 	}
-	return best_info;
+	return {};
+
+
+
+	//size_t max_agents = environment.get_number_of_agents();
+
+	//// TODO - Should sort of infos which are not probable
+	//auto collection = get_best_collaboration_rec(infos, max_tasks, max_agents, Colab_Collection{}, 
+	//	infos.begin(), state.get_ingredients_count());
+	//Collaboration_Info best_info;
+	//for (const auto& info : collection.infos) {
+	//	if (info.get_agents().contains(planning_agent) && info.value < best_info.value) {
+	//		best_info = info;
+	//	}
+	//}
+	//return best_info;
 }
 
 Colab_Collection Planner_Mac::get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
