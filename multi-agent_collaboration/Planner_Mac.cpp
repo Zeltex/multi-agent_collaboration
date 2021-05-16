@@ -68,6 +68,9 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 	auto probable_infos = calculate_probable_multi_goals(infos, goal_values, state);
 	size_t max_tasks = environment.get_number_of_agents();
 	auto info = get_best_collaboration(probable_infos, max_tasks, state);
+	if (!info.has_value()) {
+		info = get_best_collaboration(infos, max_tasks, state);
+	}
 
 
 	std::stringstream buffer3;
