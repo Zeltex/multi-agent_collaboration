@@ -531,7 +531,7 @@ private:
 	void update_recogniser(const Paths& paths);
 
 	Collaboration_Info get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
-		const size_t& max_tasks, const State& state);
+		const size_t& max_tasks, const State& state, bool track_compatibility);
 	Colab_Collection get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
 		const size_t& max_tasks, const size_t& max_agents, const Colab_Collection& collection,
 		std::vector<Collaboration_Info>::const_iterator it_in,

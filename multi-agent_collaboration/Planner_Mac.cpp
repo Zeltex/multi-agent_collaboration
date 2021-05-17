@@ -67,9 +67,9 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 	auto goal_values = calculate_goal_values(infos);
 	auto probable_infos = calculate_probable_multi_goals(infos, goal_values, state);
 	size_t max_tasks = environment.get_number_of_agents();
-	auto info = get_best_collaboration(probable_infos, max_tasks, state);
+	auto info = get_best_collaboration(probable_infos, max_tasks, state, true);
 	if (!info.has_value()) {
-		info = get_best_collaboration(infos, max_tasks, state);
+		info = get_best_collaboration(infos, max_tasks, state, false);
 	}
 
 
@@ -882,7 +882,7 @@ void Planner_Mac::trim_trailing_non_actions(std::vector<Joint_Action>& joint_act
 //}
 
 Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
-	const size_t& max_tasks, const State& state) {
+	const size_t& max_tasks, const State& state, bool track_compatibility) {
 
 	auto infos_copy = infos;
 	std::sort(infos_copy.begin(), infos_copy.end(), [](const Collaboration_Info& lhs, const Collaboration_Info& rhs) {
@@ -891,21 +891,25 @@ Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collabo
 
 	auto ingredients = state.get_ingredients_count();
 	for (const auto& info : infos_copy) {
-		bool ingredients_available = true;
-		auto new_ingredients = ingredients;
-		for (const auto& goal : info.get_goals()) {
-			if (!new_ingredients.have_ingredients(goal.recipe, environment)) {
-				ingredients_available = false;
-				break;
-			} else {
-				new_ingredients.perform_recipe(goal.recipe, environment);
+		if (track_compatibility) {
+			bool ingredients_available = true;
+			auto new_ingredients = ingredients;
+			for (const auto& goal : info.get_goals()) {
+				if (!new_ingredients.have_ingredients(goal.recipe, environment)) {
+					ingredients_available = false;
+					break;
+				} else {
+					new_ingredients.perform_recipe(goal.recipe, environment);
+				}
 			}
-		}
-		if (ingredients_available) {
-			ingredients = new_ingredients;
-			if (info.get_agents().contains(planning_agent)) return info;
+			if (ingredients_available) {
+				ingredients = new_ingredients;
+				if (info.get_agents().contains(planning_agent)) return info;
+			} else {
+				continue;
+			}
 		} else {
-			continue;
+			if (info.get_agents().contains(planning_agent)) return info;
 		}
 	}
 	return {};
