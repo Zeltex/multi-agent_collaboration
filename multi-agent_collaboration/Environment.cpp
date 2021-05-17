@@ -89,14 +89,40 @@ bool Environment::act(State& state, const Joint_Action& action) const {
 	return act(state, action, Print_Level::VERBOSE);
 }
 
+//bool Environment::act(State& state, const Joint_Action& joint_action, Print_Level print_level) const {
+//	auto temp_action = joint_action; // Need to modify the action, potentially take non-const as argument instead
+//	if (contains_collisions(state, temp_action)) {
+//		return false;
+//	}
+//	for (const auto& action : temp_action.actions) {
+//		if (!act(state, action, print_level)) {
+//			return false;
+//		}
+//	}
+//	return true;
+//}
+
+// Had to do this method pretty weird, since BD have pretty weird rules
+// Any action related to counters (pickup, put down, merge, deliver) is valied as long as it was valid in the original state
+// Any action which causes an inter-agent collision is invalid no matter if it was valid in the original state
 bool Environment::act(State& state, const Joint_Action& joint_action, Print_Level print_level) const {
-	auto temp_action = joint_action; // Need to modify the action, potentially take non-const as argument instead
-	if (contains_collisions(state, temp_action)) {
+	if (contains_collisions(state, joint_action)) {
 		return false;
 	}
-	for (const auto& action : temp_action.actions) {
-		if (!act(state, action, print_level)) {
-			return false;
+	const State original_state = state;
+	bool first = true;
+	for (const auto& action : joint_action.actions) {
+		if (first) {
+			first = false;
+			if (!act(state, action, print_level)) {
+				return false;
+			}
+		} else {
+			State state_copy = original_state;
+			if (!act(state_copy, action, print_level)) {
+				return false;
+			}
+			act(state, action, print_level);
 		}
 	}
 	return true;
@@ -195,7 +221,8 @@ bool Environment::act(State& state, const Action& action, Print_Level print_leve
 
 // This collision check is basically a one to one from the BD, but I believe it allows two agents to collide if one is no'opping, need to check this
 // UPDATE: the original code did allow collision with stationary agents, changed it to disallow this even though I believe that BD allows it
-bool Environment::contains_collisions(const State& state, Joint_Action& joint_action) const {
+// To clarify, it seem the BD environment is over liberal with what it allows, the real restrictions in what actions the BD planner considers legal
+bool Environment::contains_collisions(const State& state, const Joint_Action& joint_action) const {
 	std::vector<Coordinate> current_coordinates;
 	std::vector<Coordinate> next_coordinates;
 	std::vector<Coordinate> action_coordinates;
@@ -232,10 +259,10 @@ bool Environment::contains_collisions(const State& state, Joint_Action& joint_ac
 			} 
 			
 			// Accessing same counter space
-			else if (action_coordinates.at(agent1) == action_coordinates.at(agent2)) {
-				cancelled_agents.insert(agent1);
-				cancelled_agents.insert(agent2);
-			}
+			//else if (action_coordinates.at(agent1) == action_coordinates.at(agent2)) {
+			//	cancelled_agents.insert(agent1);
+			//	cancelled_agents.insert(agent2);
+			//}
 		}
 	}
 	return !cancelled_agents.empty();

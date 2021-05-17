@@ -400,23 +400,23 @@ public:
 		load_recipes();
 	};
 
-	bool is_inbound(const Coordinate& coordiante) const;
-	bool is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
-	bool is_cell_type(const Coordinate& coordinate, const Direction& direction, const Cell_Type& type) const;
-	bool is_type_stationary(Ingredient ingredient) const;
-	bool is_done(const State& state) const;
-	bool act(State& state, const Action& action) const;
-	bool act(State& state, const Action& action, Print_Level print_level) const;
-	bool act(State& state, const Joint_Action& action) const;
-	bool act(State& state, const Joint_Action& action, Print_Level print_level) const;
-	State load(const std::string& path);
-	Coordinate move(const Coordinate& coordinate, Direction direction) const;
-	Coordinate move_noclip(const Coordinate& coordinate, Direction direction) const;
-	void print_state() const;
-	void print_state(const State& state) const;
-	void play(State& state) const;
-	Joint_Action convert_to_joint_action(const Action& action, Agent_Id agent) const;
-	bool do_ingredients_lead_to_goal(const Ingredients& ingredients_count) const;
+	bool			act(State& state, const Action& action) const;
+	bool			act(State& state, const Action& action, Print_Level print_level) const;
+	bool			act(State& state, const Joint_Action& action) const;
+	bool			act(State& state, const Joint_Action& action, Print_Level print_level) const;
+	Joint_Action	convert_to_joint_action(const Action& action, Agent_Id agent) const;
+	bool			do_ingredients_lead_to_goal(const Ingredients& ingredients_count) const;
+	bool			is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
+	bool			is_cell_type(const Coordinate& coordinate, const Direction& direction, const Cell_Type& type) const;
+	bool			is_done(const State& state) const;
+	bool			is_inbound(const Coordinate& coordiante) const;
+	bool			is_type_stationary(Ingredient ingredient) const;
+	State			load(const std::string& path);
+	Coordinate		move(const Coordinate& coordinate, Direction direction) const;
+	Coordinate		move_noclip(const Coordinate& coordinate, Direction direction) const;
+	void			play(State& state) const;
+	void			print_state() const;
+	void			print_state(const State& state) const;
 
 	std::vector<Action>			get_actions(Agent_Id agent) const;
 	const std::vector<Recipe>&	get_all_recipes() const;
@@ -433,32 +433,32 @@ public:
 	
 
 private:
-	void load_map_line(State& state, size_t& line_counter, const std::string& line, size_t width);
-	void flip_walls_array();
-	Ingredient goal_name_to_ingredient(const std::string& name) const;
-	std::optional<Ingredient> get_recipe(Ingredient ingredient1, Ingredient ingredient2) const;
-	void load_recipes();
-	bool contains_collisions(const State& state, Joint_Action& joint_action) const;
-	void reset();
-	void calculate_recipes();
-	bool does_recipe_lead_to_goal(const Ingredients& ingredients_count, const Recipe& recipe_in) const;
+	void						calculate_recipes();
+	bool						contains_collisions(const State& state, const Joint_Action& joint_action) const;
+	bool						does_recipe_lead_to_goal(const Ingredients& ingredients_count, const Recipe& recipe_in) const;
+	void						flip_walls_array();
+	std::optional<Ingredient>	get_recipe(Ingredient ingredient1, Ingredient ingredient2) const;
+	Ingredient					goal_name_to_ingredient(const std::string& name) const;
+	void						load_map_line(State& state, size_t& line_counter, const std::string& line, size_t width);
+	void						load_recipes();
+	void						reset();
 
 
 
 	size_t width;
 	size_t height;
-
 	size_t number_of_agents;
-	std::vector<std::string> goal_names;
-	Ingredients goal_ingredients;
-	std::vector<Coordinate> agents_initial_positions;
 
-	std::vector<std::vector<bool>> walls;
-	std::vector<Coordinate> cutting_stations;
-	std::vector<Coordinate> delivery_stations;
-	std::vector<Recipe> goal_related_recipes;
+	std::vector<Coordinate>										agents_initial_positions;
+	std::vector<Recipe>											all_recipes;
+	std::vector<Coordinate>										cutting_stations;
+	std::vector<Coordinate>										delivery_stations;
+	Ingredients													goal_ingredients;
+	std::vector<std::string>									goal_names;
+	std::vector<Recipe>											goal_related_recipes;
+	std::map<std::pair<Ingredient, Ingredient>, Ingredient>		recipes_map;
+	std::vector<std::vector<bool>>								walls;
 
-	std::vector<Recipe> all_recipes;
-	std::map<std::pair<Ingredient, Ingredient>, Ingredient> recipes_map;
+
 };
 
