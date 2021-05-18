@@ -72,7 +72,6 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 		info = get_best_collaboration(infos, max_tasks, state, false);
 	}
 
-
 	std::stringstream buffer3;
 	if (info.has_value()) {
 		buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action " 
@@ -889,9 +888,12 @@ Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collabo
 		return lhs.value < rhs.value;
 		});
 
+	const Collaboration_Info* backup_result = nullptr;
+
 	auto ingredients = state.get_ingredients_count();
 	for (const auto& info : infos_copy) {
 		if (track_compatibility) {
+			// Probable
 			bool ingredients_available = true;
 			auto new_ingredients = ingredients;
 			for (const auto& goal : info.get_goals()) {
@@ -905,13 +907,34 @@ Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collabo
 			if (ingredients_available) {
 				ingredients = new_ingredients;
 				if (info.get_agents().contains(planning_agent)) return info;
-			} else {
-				continue;
 			}
 		} else {
-			if (info.get_agents().contains(planning_agent)) return info;
+
+			// Improbable, planning_agent is handoff
+			const auto& goals = info.get_goals();
+			const auto& goal = *goals.begin();
+				std::stringstream buffer;
+				buffer << "Considering " << info.to_string() << " with action " << info.next_action.to_string() << " ";
+				if (goals.size() == 1
+					&& goal.handoff_agent == planning_agent) {
+					if (info.next_action.direction != Direction::NONE) {
+						buffer << " ACCEPTED\n";
+						PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
+						return info;
+					} else {
+						buffer << " REJECTED\n";
+					}
+				}
+				PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
+			
+
+			// Improbable
+			if (backup_result == nullptr) {
+				backup_result = &info;
+			}
 		}
 	}
+	if (backup_result != nullptr) return *backup_result;
 	return {};
 
 

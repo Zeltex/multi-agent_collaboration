@@ -22,7 +22,7 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 	const std::vector<Joint_Action>& input_actions, const Agent_Combination& free_agents) {
 
 	heuristic.set(recipe.ingredient1, recipe.ingredient2, agents, handoff_agent);
-	PRINT(Print_Category::A_STAR, Print_Level::VERBOSE, std::string("\n\nStarting search ") 
+	PRINT(Print_Category::A_STAR, Print_Level::NOPE, std::string("\n\nStarting search ") 
 		+ recipe.result_char() + " " + agents.to_string() +(handoff_agent.has_value() ? "/" 
 		+ std::to_string(handoff_agent.value().id) : "") + "\n\n");
 

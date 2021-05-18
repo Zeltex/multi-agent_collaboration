@@ -152,7 +152,7 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 	// Update NONE probabilities
 	float max_prob = 0.0f;
 	for (size_t agent = 0; agent < number_of_agents; ++agent) {
-		auto progress_prob = 1 - max_progress.at(agent);
+		auto progress_prob = 1 - (max_progress.at(agent) / 3);
 		if (time_step == 1) {
 			// Not NONE on first round by default
 			progress_prob = 0.0f;
@@ -175,6 +175,7 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 
 		Goal goal{  agent, EMPTY_RECIPE, EMPTY_VAL};
 		goals.at(goal).probability = progress_prob;
+		goals.at(goal).progress_prob = progress_prob;
 	}
 
 	return max_prob;
