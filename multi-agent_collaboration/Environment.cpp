@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <set>
 #include <sstream>
+#include <stdlib.h>
 
 #include "State.hpp"
 
@@ -430,7 +431,7 @@ void Environment::print_state(const State& state) const {
 					buffer += static_cast<char>(agent_it->item.value());
 				} else {
 					char buf[2];
-					_itoa_s(std::distance(state.agents.begin(), agent_it), buf, 10);
+					sprintf(buf,"%d",std::distance(state.agents.begin(), agent_it));
 					buffer += buf[0];
 				}
 			
