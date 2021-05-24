@@ -42,26 +42,12 @@ Action Planner_Mac::get_next_action(const State& state, bool print_state) {
 		return { Direction::NONE, { planning_agent } };
 	}
 	auto paths = get_all_paths(recipes, state);
-	update_recogniser(paths);
-	auto goals = recogniser.get_goals();
+	update_recogniser(paths, state);
 	recogniser.print_probabilities();
-	auto collaboration = check_for_collaboration(paths, recipes, goals, state);
-	if (collaboration.has_value()) {
-		++time_step;
-		return collaboration.value().next_action;
-	} 
-	else {
-		++time_step;
-		return Action{ Direction::NONE, {planning_agent } };
-	}
-}
 
-std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Paths& paths, const std::vector<Recipe>& recipes_in, 
-	const std::map<Agent_Id, Goal>& goals, const State& state) {
-	
-	auto infos = calculate_infos(paths, recipes_in, state);
+	auto infos = calculate_infos(paths, recipes, state);
 	if (infos.empty()) {
-		__debugbreak;
+		return Action{ Direction::NONE, {planning_agent } };
 	}
 
 	auto goal_values = calculate_goal_values(infos);
@@ -73,15 +59,16 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 	}
 
 	std::stringstream buffer3;
+	++time_step;
 	if (info.has_value()) {
-		buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action " 
+		buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action "
 			<< info.next_action.to_string() << "\n";
 		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
-		return info;
+		return info.next_action;
 	} else {
 		buffer3 << "Agent " << planning_agent.id << " did not find relevant action\n";
 		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
-		return {};
+		return Action{ Direction::NONE, {planning_agent } };
 	}
 }
 
@@ -137,13 +124,6 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths,
 
 					auto temp_infos = get_collaboration_permutations(goals, paths, agent_permutations.at(recipes.size() - 1), state);
 					infos.insert(std::end(infos), std::begin(temp_infos), std::end(temp_infos));
-					for (const auto& info : temp_infos) {
-					}
-
-					//auto info = get_best_permutation(goals, paths, agent_permutations.at(recipes.size() - 1), state);
-					//if (info.has_value()) {
-					//	infos.push_back(std::move(info.value()));
-					//}
 				}
 			}
 		}
@@ -724,111 +704,6 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 	return infos;
 }
 
-// Calculates expected length of completion for each permutation
-// Attempts new search for each recipe if conflict in best permutation
-//std::optional<Collaboration_Info> Planner_Mac::get_best_permutation(const Goals& goals_in, const Paths& paths, 
-//	const std::vector<std::vector<Agent_Id>>& agent_permutations, const State& state) {
-//	// TODO - I believe this should be all agents, not just the ones in the goals (e.g. if only agent 1 is in the goals then size is 1, and only agent 0 is used for planning)
-//	size_t agent_size = goals_in.get_agents().size();
-//
-//	std::set<Temp_Info> permutation_infos;
-//	//std::map<Agent_Combination, std::vector<Action_Path>> permutation_paths;
-//
-//	// Get info on each permutation
-//	for (const auto& agent_permutation : agent_permutations) {
-//
-//		auto goals = goals_in;
-//		goals.update_handoffs(agent_permutation);
-//
-//		size_t length = get_permutation_length(goals, paths);
-//		if (length == EMPTY_VAL) {
-//			continue;
-//		}
-//
-//		permutation_infos.emplace(goals, length);
-//		//permutation_paths.emplace(Agent_Combination{ agent_permutation }, std::move(action_paths.value()));
-//	}
-//
-//	// Best collision free
-//	size_t best_length = HIGH_INIT_VAL;
-//	std::vector<Collaboration_Info> best_infos;
-//
-//	while (!permutation_infos.empty()) {
-//
-//		// Get and erase shortest length permutation 
-//		//auto permutation = permutation_infos.begin()->permutation;
-//		auto length = permutation_infos.begin()->length;
-//		auto goals = permutation_infos.begin()->goals;
-//		permutation_infos.erase(permutation_infos.begin());
-//
-//		// If collision-free version of earlier entries is faster
-//		if (best_length < length) {
-//			return get_random<Collaboration_Info>(best_infos);
-//		}
-//
-//		// Get conflict info
-//		//const auto& action_paths = permutation_paths.at(permutation);
-//		auto [original_joint_actions, agent_recipes] = get_actions_from_permutation(goals, paths, agent_size, state);
-//
-//		if (is_conflict_in_permutation(state, original_joint_actions)) {
-//
-//			// Perform collision avoidance search
-//			for (const auto& goal : goals) {
-//				
-//				// Skip if no agent chose to act on this recipe
-//				if (agent_recipes.find(goal.recipe) == agent_recipes.end()) {
-//					continue;
-//				}
-//				
-//				auto joint_actions = original_joint_actions;
-//				trim_trailing_non_actions(joint_actions, goal.handoff_agent);
-//
-//				// Perform new search for one recipe
-//				auto new_paths = perform_new_search(state, goal, paths, joint_actions, agent_recipes.at(goal.recipe));
-//				if (new_paths.empty()) {
-//					continue;
-//				}
-//
-//				// Get info using the new search
-//				//auto action_paths = get_permutation_action_paths(agents, recipes, new_paths, permutation.get());
-//				//if (!action_paths.has_value()) {
-//				//	continue;
-//				//}
-//				size_t new_length = get_permutation_length(goals, new_paths);
-//
-//				// Check if best collision avoidance search so far
-//				if (new_length <= best_length) {
-//					auto [joint_actions, agent_recipes] = get_actions_from_permutation(goals, new_paths, agent_size, state);
-//
-//					if (!is_conflict_in_permutation(state, joint_actions)) {
-//						Action planning_agent_action = joint_actions.at(0).get_action(planning_agent);
-//
-//						if (new_length < best_length) {
-//							best_infos.clear();
-//							best_length = new_length;
-//						}
-//						best_infos.push_back(Collaboration_Info(new_length, goals, planning_agent_action));
-//					}
-//				}
-//			}
-//
-//		// Return unmodified entry
-//		} else {
-//			Action planning_agent_action = original_joint_actions.at(0).get_action(planning_agent);
-//			if (length < best_length) {
-//				best_infos.clear();
-//				best_length = length;
-//			}
-//			best_infos.push_back(Collaboration_Info(length, goals, planning_agent_action));
-//		}
-//	}
-//	if (!best_infos.empty()) {
-//		return get_random<Collaboration_Info>(best_infos);
-//	} else {
-//		return {};
-//	}
-//}
-
 Paths Planner_Mac::perform_new_search(const State& state, const Goal& goal, const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents) {
 	auto new_path = search.search_joint(state, goal.recipe, goal.agents, goal.handoff_agent, joint_actions, acting_agents);
 	if (new_path.empty()) {
@@ -867,18 +742,6 @@ void Planner_Mac::trim_trailing_non_actions(std::vector<Joint_Action>& joint_act
 		}
 	}
 }
-
-//Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collaboration_Info>& infos,
-//	const size_t& max_tasks, const State& state) {
-//
-//	const Collaboration_Info* best_info = &(*infos.begin());
-//	for (const auto& info : infos) {
-//		if (info.value <= best_info->value && info.goals_size() > best_info->goals_size()) {
-//			best_info = &info;
-//		}
-//	}
-//	return *best_info;
-//}
 
 Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
 	const size_t& max_tasks, const State& state, bool track_compatibility) {
@@ -936,57 +799,6 @@ Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collabo
 	}
 	if (backup_result != nullptr) return *backup_result;
 	return {};
-
-
-
-	//size_t max_agents = environment.get_number_of_agents();
-
-	//// TODO - Should sort of infos which are not probable
-	//auto collection = get_best_collaboration_rec(infos, max_tasks, max_agents, Colab_Collection{}, 
-	//	infos.begin(), state.get_ingredients_count());
-	//Collaboration_Info best_info;
-	//for (const auto& info : collection.infos) {
-	//	if (info.get_agents().contains(planning_agent) && info.value < best_info.value) {
-	//		best_info = info;
-	//	}
-	//}
-	//return best_info;
-}
-
-Colab_Collection Planner_Mac::get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
-	const size_t& max_tasks, const size_t& max_agents, const Colab_Collection& collection_in,
-	std::vector<Collaboration_Info>::const_iterator it_in,
-	const Ingredients& available_ingredients) {
-
-	Colab_Collection best_collection;
-	bool found_valid_extension = false;
-
-	for (auto it = infos.begin(); it != infos.end(); ++it) {
-		if (collection_in.is_compatible(it->get_goals(), available_ingredients, environment)) {
-			auto collection = collection_in;
-			collection.add(*it);
-			collection.calculate_value(environment.get_number_of_agents());
-			found_valid_extension = true;
-
-			// A different permutation of this collection will already have been processed
-			if (it < it_in) {
-				continue;
-			}
-
-			collection = get_best_collaboration_rec(infos, max_tasks, max_agents,
-				collection, it, available_ingredients);
-
-			if (!collection.has_value()) {
-				continue;
-			}
-
-
-			if (collection.value < best_collection.value || collection.tasks > best_collection.tasks) {
-				best_collection = collection;
-			}
-		}
-	}
-	return found_valid_extension ? best_collection : collection_in;
 }
 
 Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State& state) {
@@ -1036,7 +848,6 @@ Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State
 					auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 
 					Goal goal(agents, recipe, handoff_agent);
-					Coordinate agent_coordinate = state.get_agent(planning_agent).coordinate;
 					Action_Path a_path{ path, goal, state, environment };
 
 
@@ -1063,12 +874,12 @@ Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State
 	return paths;
 }
 
-void Planner_Mac::update_recogniser(const Paths& paths) {
+void Planner_Mac::update_recogniser(const Paths& paths, const State& state) {
 	std::map<Goal, size_t> goal_lengths;
 	for (const auto& [goal, path] : paths.get_handoff()) {
 		goal_lengths.insert({ goal, path->size() });
 	}
-	recogniser.update(goal_lengths);
+	recogniser.update(goal_lengths, state);
 }
 
 bool Planner_Mac::ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const {
