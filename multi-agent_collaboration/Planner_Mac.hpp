@@ -520,69 +520,52 @@ public:
 	virtual Action get_next_action(const State& state, bool print_state) override;
 
 private:
-	Paths get_all_paths(const std::vector<Recipe>& recipes, const State& state);
-	bool ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const;
-	void initialize_reachables(const State& initial_state);
-	void initialize_solutions();
-	std::optional<Collaboration_Info> check_for_collaboration(const Paths& paths, 
-		const std::vector<Recipe>& recipes, const std::map<Agent_Id, Goal>& goals, 
+
+
+	std::vector<size_t>						calculate_adjusted_agent_handoffs(std::vector<std::set<Temp>>& agents_handoffs);
+	std::map<Goals, float>					calculate_goal_values(std::vector<Collaboration_Info>& infos);
+	std::vector<Collaboration_Info>			calculate_infos(const Paths& paths, const std::vector<Recipe>& recipes_in,
 		const State& state);
-
-	void update_recogniser(const Paths& paths);
-
-	Collaboration_Info get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
-		const size_t& max_tasks, const State& state, bool track_compatibility);
-	Colab_Collection get_best_collaboration_rec(const std::vector<Collaboration_Info>& infos, 
-		const size_t& max_tasks, const size_t& max_agents, const Colab_Collection& collection,
-		std::vector<Collaboration_Info>::const_iterator it_in,
-		const Ingredients& available_ingredients);
-
-	std::optional<Collaboration_Info> get_best_permutation(const Goals& goals, 
-		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
-		const State& state);
-
-	std::vector<Collaboration_Info> get_collaboration_permutations(const Goals& goals,
-		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
-		const State& state);
-
-	bool is_conflict_in_permutation(const State& initial_state, 
-		const std::vector<Joint_Action>& actions);
-
-	Collaboration_Info get_action_from_permutation(const Agent_Combination& best_permutation,
+	std::vector<Collaboration_Info>			calculate_probable_multi_goals(const std::vector<Collaboration_Info>& infos,
+		const std::map<Goals, float>& goal_values, const State& state);
+	Collaboration_Info						get_action_from_permutation(const Agent_Combination& best_permutation,
 		const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
 		const size_t& best_length);
-
-	std::pair<std::vector<Joint_Action>, std::map<Recipe, Agent_Combination>> get_actions_from_permutation(
+	std::pair<std::vector<Joint_Action>, 
+		std::map<Recipe, Agent_Combination>>get_actions_from_permutation(
 		const Goals& goals, const Paths& paths, size_t agent_size, const State& state);
-
-	std::pair<std::vector<Action>, Recipe> get_actions_from_permutation_inner(const Goals& goals,
+	std::pair<std::vector<Action>, Recipe>	get_actions_from_permutation_inner(const Goals& goals,
 		const Agent_Id& acting_agent, const Paths& paths, const State& state);
-
-	std::vector<std::set<Temp>> get_agent_handoff_infos( 
+	std::vector<std::set<Temp>>				get_agent_handoff_infos( 
 		const Agent_Combination& agents, const std::vector<Agent_Id>& agent_permutation, 
 		const std::vector<Action_Path>& action_paths);
-	std::vector<size_t> calculate_adjusted_agent_handoffs(std::vector<std::set<Temp>>& agents_handoffs);
-
-	size_t get_permutation_length(const Goals& goals, const Paths& paths);
-
+	Paths									get_all_paths(const std::vector<Recipe>& recipes, const State& state);
+	Collaboration_Info						get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
+		const size_t& max_tasks, const State& state, bool track_compatibility);
+	std::optional<Collaboration_Info>		get_best_permutation(const Goals& goals, 
+		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
+		const State& state);
+	std::vector<Collaboration_Info>			get_collaboration_permutations(const Goals& goals,
+		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
+		const State& state);
 	std::optional<std::vector<Action_Path>> get_permutation_action_paths(const Goals& goals,
 		const Paths& paths) const;
+	size_t									get_permutation_length(const Goals& goals, const Paths& paths);
+	bool									ingredients_reachable(const Recipe& recipe, 
+		const Agent_Combination& agents, const State& state) const;
+	void									initialize_reachables(const State& initial_state);
+	void									initialize_solutions();
+	bool									is_agent_abused(const Goals& goals, const Paths& paths) const;
+	bool									is_conflict_in_permutation(const State& initial_state, 
+		const std::vector<Joint_Action>& actions);
+	bool									is_agent_subset_faster(const Collaboration_Info& info, 
+		const std::map<Goals, float>& goal_values);
+	Paths									perform_new_search(const State& state, const Goal& goal, 
+		const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents);
+	void									trim_trailing_non_actions(std::vector<Joint_Action>& joint_actions, 
+		const Agent_Id& handoff_agent);
+	void									update_recogniser(const Paths& paths, const State& state);
 
-	bool is_agent_abused(const Goals& goals, const Paths& paths) const;
-
-	std::map<Goals, float> calculate_goal_values(std::vector<Collaboration_Info>& infos);
-
-	std::vector<Collaboration_Info> calculate_probable_multi_goals(const std::vector<Collaboration_Info>& infos,
-		const std::map<Goals, float>& goal_values, const State& state);
-
-	std::vector<Collaboration_Info> calculate_infos(const Paths& paths, const std::vector<Recipe>& recipes_in,
-		const State& state);
-
-	void trim_trailing_non_actions(std::vector<Joint_Action>& joint_actions, const Agent_Id& handoff_agent);
-
-	Paths perform_new_search(const State& state, const Goal& goal, const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents);
-
-	bool is_agent_subset_faster(const Collaboration_Info& info, const std::map<Goals, float>& goal_values);
 
 	Recogniser recogniser;
 	Search search;

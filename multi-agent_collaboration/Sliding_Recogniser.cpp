@@ -17,17 +17,28 @@ Sliding_Recogniser::Sliding_Recogniser(const Environment& environment, const Sta
 	for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
 		Goal goal{ agent , EMPTY_RECIPE, EMPTY_VAL };
 		goals.insert({ goal,  {} }); 
-		agents_active_status.emplace_back();
+		//agents_active_status.emplace_back();
 	}
 }
 
-void Sliding_Recogniser::insert(const std::map<Goal, size_t>& goal_lengths) {
+void Sliding_Recogniser::insert(const std::map<Goal, size_t>& goal_lengths, const State& state) {
 	for (const auto& [goal, length] : goal_lengths) {
 		auto it = goals.find(goal);
 		if (it == goals.end()) {
 			goals.insert({ goal, Goal_Entry{length, time_step} });
 		} else {
 			it->second.add(length, time_step);
+		}
+	}
+
+	for (auto& [key, val] : goals) {
+		if (val.is_current(time_step)) {
+			continue;
+		}
+		if (state.contains_item(key.recipe.result)) {
+			val.add(0, time_step);
+		} else {
+			val.repeat(time_step);
 		}
 	}
 }
@@ -159,15 +170,15 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 		}
 		// Note if previous window was optimal
 		// TODO - May be replaced by new system of replacing empty length entries
-		bool previous_active_status = time_step == 1 ? true : agents_active_status.at(agent).back();
+		//bool previous_active_status = time_step == 1 ? true : agents_active_status.at(agent).back();
 		
 		// If entire window has been optimal
-		agents_active_status.at(agent).push_back(progress_prob == 0.0f);
+		//agents_active_status.at(agent).push_back(progress_prob == 0.0f);
 
 		// non-probability is 0% the step after having entire optimal window by default
-		if (previous_active_status) {
-			progress_prob = 0.0f;
-		}
+		//if (previous_active_status) {
+		//	progress_prob = 0.0f;
+		//}
 
 		progress_prob *= beta;
 
@@ -189,9 +200,9 @@ void Sliding_Recogniser::normalise(float max_prob) {
 
 
 
-void Sliding_Recogniser::update(const std::map<Goal, size_t>& goal_lengths) {
+void Sliding_Recogniser::update(const std::map<Goal, size_t>& goal_lengths, const State& state) {
 	++time_step;
-	insert(goal_lengths);
+	insert(goal_lengths, state);
 
 
 	size_t base_window_index = time_step >= WINDOW_SIZE ? time_step - WINDOW_SIZE : 0;

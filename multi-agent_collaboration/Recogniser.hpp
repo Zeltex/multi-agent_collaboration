@@ -156,7 +156,7 @@ public:
 	Recogniser_Method(const Environment& environment, const State& initial_state) 
 		: environment(environment), state(initial_state) {}
 
-	virtual void update(const std::map<Goal, size_t>& goal_lengths) = 0;
+	virtual void update(const std::map<Goal, size_t>& goal_lengths, const State& state) = 0;
 	virtual Goal get_goal(Agent_Id agent) = 0;
 	virtual std::map<Agent_Id, Goal> get_goals() const = 0;
 	virtual std::map<Goal, float> get_raw_goals() const = 0;
@@ -176,8 +176,8 @@ public:
 	Recogniser(std::unique_ptr<Recogniser_Method> recogniser_method) 
 		: recogniser_method(std::move(recogniser_method)) {};
 	
-	void update(const std::map<Goal, size_t>& goal_lengths) {
-		recogniser_method->update(goal_lengths); 
+	void update(const std::map<Goal, size_t>& goal_lengths, const State& state) {
+		recogniser_method->update(goal_lengths, state); 
 	}
 	
 	Goal get_goal(Agent_Id agent) { 

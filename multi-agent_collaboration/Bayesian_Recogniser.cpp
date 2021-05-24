@@ -4,7 +4,7 @@ Bayesian_Recogniser::Bayesian_Recogniser(const Environment& environment, const S
 	: Recogniser_Method(environment, initial_state) {};
 
 
-void Bayesian_Recogniser::update(const std::map<Goal, size_t>& goal_lengths) {
+void Bayesian_Recogniser::update(const std::map<Goal, size_t>& goal_lengths, const State& state) {
 	throw std::runtime_error("Not implemented");
 }
 
