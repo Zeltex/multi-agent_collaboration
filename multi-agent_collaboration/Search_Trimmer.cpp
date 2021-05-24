@@ -1,5 +1,4 @@
 #include "Search_Trimmer.hpp"
-#include <ranges>
 
 void Search_Trimmer::trim(std::vector<Joint_Action>& actions, const State& state, const Environment& environment, const Recipe& recipe) const {
 	

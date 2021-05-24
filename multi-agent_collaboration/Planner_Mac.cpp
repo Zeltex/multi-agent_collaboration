@@ -61,7 +61,7 @@ std::optional<Collaboration_Info> Planner_Mac::check_for_collaboration(const Pat
 	
 	auto infos = calculate_infos(paths, recipes_in, state);
 	if (infos.empty()) {
-		__debugbreak;
+		return {};
 	}
 
 	auto goal_values = calculate_goal_values(infos);

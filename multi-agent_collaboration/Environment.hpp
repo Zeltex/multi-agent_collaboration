@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cassert>
 #include <set>
+#include <algorithm>
 
 using Coordinate = std::pair<size_t, size_t> ;
 
