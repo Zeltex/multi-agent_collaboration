@@ -546,7 +546,7 @@ size_t Planner_Mac::get_permutation_length(const Goals& goals, const Paths& path
 	for (const auto& entry : sorted) {
 		size_t extra_length = entry.length;
 		if (entry.handoff_time != EMPTY_VAL) {
-			// Note the +1's are from
+			// Note the +1's are from index to length conversion
 			handoffs.at(entry.agent.id) += entry.handoff_time + 1;
 			extra_length -= (entry.handoff_time + 1);
 		}

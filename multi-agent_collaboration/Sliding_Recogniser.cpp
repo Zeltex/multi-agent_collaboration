@@ -276,7 +276,9 @@ float Sliding_Recogniser::get_non_probability(Agent_Id agent) const {
 	return goals.at(Goal(agent, EMPTY_RECIPE, EMPTY_VAL)).probability;
 }
 
-bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, Agent_Id acting_agent, Agent_Id planning_agent, bool use_non_probability) const {
+bool Sliding_Recogniser::is_probable_normalised(Goal goal, const std::vector<Goal>& available_goals, 
+	Agent_Id acting_agent, Agent_Id planning_agent, bool use_non_probability) const {
+
 	float highest_prob = 0.0f;
 	auto it = goals.find(goal);
 	if (it == goals.end()) {
