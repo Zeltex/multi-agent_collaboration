@@ -127,8 +127,8 @@ struct Node_Queue_Comparator {
 	bool operator()(const Node* lhs, const Node* rhs) const {
 		if (lhs->f() != rhs->f()) return lhs->f() > rhs->f();
 		if (lhs->g != rhs->g) return lhs->g < rhs->g;
-		if (lhs->pass_time != rhs->pass_time) return lhs->pass_time > rhs->pass_time;
 		if (lhs->action_count != rhs->action_count) return lhs->action_count > rhs->action_count;
+		if (lhs->pass_time != rhs->pass_time) return lhs->pass_time > rhs->pass_time;
 
 		if (lhs->handoff_first_action != rhs->handoff_first_action) 
 			return lhs->handoff_first_action > rhs->handoff_first_action;

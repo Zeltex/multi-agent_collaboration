@@ -81,6 +81,17 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 	std::vector<float> max_progress(number_of_agents, 0.0f);
 	std::vector<bool> agents_useful(number_of_agents, false);
 
+	std::vector<Agent_Id> all_agents;
+	std::vector<std::vector<Agent_Combination>> agent_permutations(number_of_agents, std::vector<Agent_Combination>());
+	for (size_t i = 0; i < number_of_agents; ++i) {
+		all_agents.push_back({ i });
+	}
+	for (size_t i = 0; i < number_of_agents; ++i) {
+		for (auto& combination : get_combinations<Agent_Id>({ all_agents }, i + 1)) {
+			agent_permutations.at(i).push_back(Agent_Combination{ combination });
+		}
+	}
+
 	// Record largest progression/diff towards a single goal/combination
 	for (auto& [goal, goal_entry] : goals) {
 		// Skip irrelevant goals and initial state
@@ -109,54 +120,81 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 		// TODO - Progress should probably also be recorded for single agent goals, even though this should
 		//		be covered by the multi agent cases
 
-		if (goal.agents.size() > 1) {
-			for (auto& agent : goal.agents.get()) {
-				bool is_useful = true;
-				//auto agent_goal_it = goals.find(Goal{ Agent_Combination{agent}, goal.recipe });
-				//if (agent_goal_it == goals.end()) {
-				//	exit(-1);
-				//}
-				//auto agent_prob = agent_goal_it->second.probability;
-				auto agent_prob = goal_entry.probability;
-				auto agents = goal.agents;
-				agents.remove(agent);
-				auto combinations = get_combinations(agents);
-				for (auto& combination : combinations) {
-					auto possible_handoff_agents = combination.get();
+		for (auto& agent : goal.agents.get()) {
+			bool is_useful = true;
+			auto agent_prob = goal_entry.probability;
+			for (size_t i = 0; i < agent_permutations.size(); ++i) {
+				for (const auto& permutation : agent_permutations.at(i)) {
+					
+					if (permutation.contains(agent)) {
+						continue;
+					}
+					auto possible_handoff_agents = permutation.get();
 					possible_handoff_agents.push_back(EMPTY_VAL);
 					for (const auto& handoff_agent : possible_handoff_agents) {
-						auto it = goals.find(Goal(combination, goal.recipe, handoff_agent));
+						auto it = goals.find(Goal(Agent_Combination{ permutation }, goal.recipe, handoff_agent));
 						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
 							is_useful = false;
 							break;
 						}
 					}
 				}
-				if (is_useful) {
-					agents_useful.at(agent.id) = true;
-					auto& ref = max_progress.at(agent.id);
-					ref = std::max(ref, progress);
-				}
-			}
-		} else {
-			bool is_useful = true;
-			auto agent_prob = goal_entry.probability;
-			Agent_Id actual_agent = *goal.agents.get().begin();
-
-			for (size_t agent = 0; agent < number_of_agents; ++agent) {
-				if (Agent_Id{ agent } == actual_agent) continue;
-				auto it = goals.find(Goal(Agent_Id{ agent }, goal.recipe, EMPTY_VAL));
-				if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
-					is_useful = false;
-					break;
-				}
 			}
 			if (is_useful) {
-				agents_useful.at(actual_agent.id) = true;
-				auto& ref = max_progress.at(actual_agent.id);
+				agents_useful.at(agent.id) = true;
+				auto& ref = max_progress.at(agent.id);
 				ref = std::max(ref, progress);
 			}
 		}
+
+		//if (goal.agents.size() > 1) {
+		//	for (auto& agent : goal.agents.get()) {
+		//		bool is_useful = true;
+		//		//auto agent_goal_it = goals.find(Goal{ Agent_Combination{agent}, goal.recipe });
+		//		//if (agent_goal_it == goals.end()) {
+		//		//	exit(-1);
+		//		//}
+		//		//auto agent_prob = agent_goal_it->second.probability;
+		//		auto agent_prob = goal_entry.probability;
+		//		auto agents = goal.agents;
+		//		agents.remove(agent);
+		//		auto combinations = get_combinations(agents);
+		//		for (auto& combination : combinations) {
+		//			auto possible_handoff_agents = combination.get();
+		//			possible_handoff_agents.push_back(EMPTY_VAL);
+		//			for (const auto& handoff_agent : possible_handoff_agents) {
+		//				auto it = goals.find(Goal(combination, goal.recipe, handoff_agent));
+		//				if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
+		//					is_useful = false;
+		//					break;
+		//				}
+		//			}
+		//		}
+		//		if (is_useful) {
+		//			agents_useful.at(agent.id) = true;
+		//			auto& ref = max_progress.at(agent.id);
+		//			ref = std::max(ref, progress);
+		//		}
+		//	}
+		//} else {
+		//	bool is_useful = true;
+		//	auto agent_prob = goal_entry.probability;
+		//	Agent_Id actual_agent = *goal.agents.get().begin();
+
+		//	for (size_t agent = 0; agent < number_of_agents; ++agent) {
+		//		if (Agent_Id{ agent } == actual_agent) continue;
+		//		auto it = goals.find(Goal(Agent_Id{ agent }, goal.recipe, EMPTY_VAL));
+		//		if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
+		//			is_useful = false;
+		//			break;
+		//		}
+		//	}
+		//	if (is_useful) {
+		//		agents_useful.at(actual_agent.id) = true;
+		//		auto& ref = max_progress.at(actual_agent.id);
+		//		ref = std::max(ref, progress);
+		//	}
+		//}
 
 	}
 
