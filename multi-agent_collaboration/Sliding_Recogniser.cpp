@@ -59,10 +59,7 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 			auto length_prob = (alpha / (new_length + alpha));
 			//val.probability = (alpha * 1.0f / val.lengths.at(window_index))
 			auto progress_prob = ((float)val.lengths.at(window_index)) / (val.lengths.at(time_step - 1) + window_length);
-			progress_prob *= 1 - (key.agents.size() - 1) * 0.1;
-			//progress_prob = std::pow(progress_prob, 1 + (key.agents.size() - 1) * 0.8);
-			//progress_prob = std::pow(progress_prob, 1 + (key.agents.size() - 1) * 0.5);
-			//progress_prob = std::pow(progress_prob, 1 - (key.agents.size() - 1) * 0.1);
+			progress_prob = std::pow(progress_prob, 1 + (key.agents.size() - 1) * 0.5);
 
 			if (window_length == 0) {
 				constexpr float new_goal_penalty = 0.8f;
@@ -96,14 +93,14 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 	}
 
 	// Record largest progression/diff towards a single goal/combination
-	for (auto& [goal, goal_entry] : goals) {
+	for (auto& [key, val] : goals) {
 		// Skip irrelevant goals and initial state
 		// TODO - The skip irrelevant part should be replaced by new system which replaces
 		// empty entries with the last non-empty entry
-		if (!goal_entry.is_current(time_step) || time_step == 1) {
+		if (!val.is_current(time_step) || time_step == 1) {
 			continue;
 		}
-		size_t window_index = goal_entry.get_non_empty_index(base_window_index);
+		size_t window_index = val.get_non_empty_index(base_window_index);
 		
 		// Skip non-goals
 		if (window_index == EMPTY_VAL) {
@@ -116,17 +113,24 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 			window_length += 1;
 		}
 
-		float absolute_progress = (float)goal_entry.lengths.at(window_index) - (goal_entry.lengths.at(time_step - 1));
-		float progress = absolute_progress / window_length;
+		//float absolute_progress = (float)val.lengths.at(window_index) - (val.lengths.at(time_step - 1));
+		//float progress = absolute_progress / window_length;
 
-		//auto progress = ((float)goal_entry.lengths.at(window_index)) / (goal_entry.lengths.at(time_step - 1) + window_length);
-		//progress = std::pow(progress, 1 + (goal.agents.size() - 1) * 0.5);
+		float old_length = (float)val.lengths.at(window_index);
+		float new_length = (float)val.lengths.at(time_step - 1);
+		auto progress = old_length / (new_length + window_length);
+		progress = std::pow(progress, 1 + (key.agents.size() - 1) * 0.5);
+
+		auto min_progress = old_length / (old_length + window_length);
+		min_progress = std::pow(min_progress, 1 + (key.agents.size() - 1) * 0.5);
+
+		progress -= min_progress;
 
 		progress = std::max(std::min(progress, 1.0f), 0.0f);
 
-		for (auto& agent : goal.agents.get()) {
+		for (auto& agent : key.agents.get()) {
 			bool is_useful = true;
-			auto agent_prob = goal_entry.probability;
+			auto agent_prob = val.probability;
 			for (size_t i = 0; i < agent_permutations.size(); ++i) {
 				for (const auto& permutation : agent_permutations.at(i)) {
 					
@@ -136,7 +140,7 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 					auto possible_handoff_agents = permutation.get();
 					possible_handoff_agents.push_back(EMPTY_VAL);
 					for (const auto& handoff_agent : possible_handoff_agents) {
-						auto it = goals.find(Goal(Agent_Combination{ permutation }, goal.recipe, handoff_agent));
+						auto it = goals.find(Goal(Agent_Combination{ permutation }, key.recipe, handoff_agent));
 						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
 							is_useful = false;
 							break;
