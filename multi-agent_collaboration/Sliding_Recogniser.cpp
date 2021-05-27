@@ -61,15 +61,15 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 			auto progress_prob = ((float)val.lengths.at(window_index)) / (val.lengths.at(time_step - 1) + window_length);
 			progress_prob = std::pow(progress_prob, 1 + (key.agents.size() - 1) * 0.5);
 
-			if (window_length == 0) {
-				constexpr float new_goal_penalty = 0.8f;
-				val.probability = length_prob * new_goal_penalty;
-				val.length_prob = length_prob;		// debug
-			} else {
+			//if (window_length == 0) {
+			//	constexpr float new_goal_penalty = 0.8f;
+			//	val.probability = length_prob * new_goal_penalty;
+			//	val.length_prob = length_prob;		// debug
+			//} else {
 				val.probability = length_prob * progress_prob;
 				val.length_prob = length_prob;		// debug
 				val.progress_prob = progress_prob;	// debug
-			}
+			//}
 		}
 		if (val.probability > max_prob) max_prob = val.probability;
 	}
@@ -113,18 +113,8 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 			window_length += 1;
 		}
 
-		//float absolute_progress = (float)val.lengths.at(window_index) - (val.lengths.at(time_step - 1));
-		//float progress = absolute_progress / window_length;
-
-		float old_length = (float)val.lengths.at(window_index);
-		float new_length = (float)val.lengths.at(time_step - 1);
-		auto progress = old_length / (new_length + window_length);
-		progress = std::pow(progress, 1 + (key.agents.size() - 1) * 0.5);
-
-		auto min_progress = old_length / (old_length + window_length);
-		min_progress = std::pow(min_progress, 1 + (key.agents.size() - 1) * 0.5);
-
-		progress -= min_progress;
+		float absolute_progress = (float)val.lengths.at(window_index) - (val.lengths.at(time_step - 1));
+		float progress = absolute_progress / window_length;
 
 		progress = std::max(std::min(progress, 1.0f), 0.0f);
 
