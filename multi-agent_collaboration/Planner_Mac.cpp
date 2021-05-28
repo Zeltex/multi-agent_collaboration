@@ -21,6 +21,7 @@
 
 constexpr auto INITIAL_DEPTH_LIMIT = 30;
 constexpr auto GAMMA = 1.01;
+constexpr auto GAMMA2 = 1.05;
 
 Planner_Mac::Planner_Mac(Environment environment, Agent_Id planning_agent, const State& initial_state)
 	: Planner_Impl(environment, planning_agent), time_step(0), 
@@ -245,7 +246,8 @@ bool Planner_Mac::is_agent_subset_faster(const Collaboration_Info& info, const s
 std::map<Goals, float> Planner_Mac::calculate_goal_values(std::vector<Collaboration_Info>& infos) {
 	std::map<Goals, float> goal_values;
 	for (auto& entry : infos) {
-		auto penalty = std::pow(GAMMA, entry.agents_size() - entry.goals_size());
+		//auto penalty = std::pow(GAMMA, entry.agents_size() - entry.goals_size());
+		auto penalty = std::pow(GAMMA, entry.agents_size()) / std::pow(GAMMA2, entry.goals_size());
 		entry.value = (penalty * entry.length) / entry.goals_size();
 
 		auto goals = entry.get_goals();
