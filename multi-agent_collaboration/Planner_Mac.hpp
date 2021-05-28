@@ -533,7 +533,7 @@ private:
 		const size_t& best_length);
 	std::pair<std::vector<Joint_Action>, 
 		std::map<Recipe, Agent_Combination>>get_actions_from_permutation(
-		const Goals& goals, const Paths& paths, size_t agent_size, const State& state);
+		const Goals& goals, const Paths& paths, const State& state);
 	std::pair<std::vector<Action>, Recipe>	get_actions_from_permutation_inner(const Goals& goals,
 		const Agent_Id& acting_agent, const Paths& paths, const State& state);
 	std::vector<std::set<Temp>>				get_agent_handoff_infos( 

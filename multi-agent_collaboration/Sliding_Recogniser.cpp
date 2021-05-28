@@ -10,7 +10,7 @@ constexpr auto WINDOW_SIZE = 4;
 constexpr auto alpha = 100.0f;			// Inverse weight of solution length in goal probability
 constexpr auto beta = 0.9f;				// Adjust NONE probability scale
 constexpr auto charlie = 0.8;			// Threshold for goal being probable
-//constexpr auto delta = 1.05;				// Collaboration penalty
+constexpr auto delta = 1.05;				// Collaboration penalty
 
 Sliding_Recogniser::Sliding_Recogniser(const Environment& environment, const State& initial_state)
 	: Recogniser_Method(environment, initial_state), goals(), time_step(0) {

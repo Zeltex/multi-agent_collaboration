@@ -289,19 +289,14 @@ bool Planner_Mac::is_conflict_in_permutation(const State& initial_state, const s
 
 
 std::pair<std::vector<Joint_Action>, std::map<Recipe, Agent_Combination>> Planner_Mac::get_actions_from_permutation(
-	const Goals& goals, const Paths& paths, size_t agent_size, const State& state) {
+	const Goals& goals, const Paths& paths, const State& state) {
 
 	std::map<Recipe, Agent_Combination> agent_recipes;
-	std::vector<Joint_Action> joint_actions(action_trace_length, agent_size);
+	std::vector<Joint_Action> joint_actions(action_trace_length, goals.get_agents().size());
 
-	for (size_t agent = 0; agent < agent_size; ++agent) {
-		auto [actions, recipe] = get_actions_from_permutation_inner(goals, { agent }, paths, state);
-		auto it = agent_recipes.find(recipe);
-		if (it == agent_recipes.end()) {
-			agent_recipes.insert({ recipe, Agent_Combination(agent) });
-		} else {
-			it->second.add({ agent });
-		}
+	for (const auto& agent : goals.get_agents()) {
+		auto [actions, recipe] = get_actions_from_permutation_inner(goals, agent, paths, state);
+		agent_recipes[recipe].add(agent);
 
 		for (size_t action_index = 0; action_index < actions.size(); ++action_index) {
 			joint_actions.at(action_index).update_action(agent, actions.at(action_index).direction);
@@ -637,7 +632,6 @@ std::optional<std::vector<Action_Path>> Planner_Mac::get_permutation_action_path
 std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(const Goals& goals_in,
 	const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
 	const State& state) {
-	size_t agent_size = goals_in.get_agents().size();
 
 	std::vector<Collaboration_Info> infos;
 
@@ -653,7 +647,7 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 		}
 
 		// Get conflict info
-		auto [original_joint_actions, agent_recipes] = get_actions_from_permutation(goals, paths, agent_size, state);
+		auto [original_joint_actions, agent_recipes] = get_actions_from_permutation(goals, paths, state);
 
 		if (is_conflict_in_permutation(state, original_joint_actions)) {
 
@@ -682,7 +676,7 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 				// Check if best collision avoidance search so far
 				// TODO - Not sure if should introduce randomness between equal choices of collision avoidance
 				if (new_length < best_length) {
-					auto [joint_actions, agent_recipes] = get_actions_from_permutation(goals, new_paths, agent_size, state);
+					auto [joint_actions, agent_recipes] = get_actions_from_permutation(goals, new_paths, state);
 
 					if (!is_conflict_in_permutation(state, joint_actions)) {
 						Action planning_agent_action = joint_actions.at(0).get_action(planning_agent);
