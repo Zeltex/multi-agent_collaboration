@@ -79,7 +79,7 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 
 float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, size_t number_of_agents){
 	std::vector<float> max_progress(number_of_agents, 0.0f);
-	std::vector<bool> agents_useful(number_of_agents, false);
+	//std::vector<bool> agents_useful(number_of_agents, false);
 
 	std::vector<Agent_Id> all_agents;
 	std::vector<std::vector<Agent_Combination>> agent_permutations(number_of_agents, std::vector<Agent_Combination>());
@@ -131,7 +131,8 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 					possible_handoff_agents.push_back(EMPTY_VAL);
 					for (const auto& handoff_agent : possible_handoff_agents) {
 						auto it = goals.find(Goal(Agent_Combination{ permutation }, key.recipe, handoff_agent));
-						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
+						//if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
+						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob * delta) {
 							is_useful = false;
 							break;
 						}
@@ -139,7 +140,7 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 				}
 			}
 			if (is_useful) {
-				agents_useful.at(agent.id) = true;
+				//agents_useful.at(agent.id) = true;
 				auto& ref = max_progress.at(agent.id);
 				ref = std::max(ref, progress);
 			}
