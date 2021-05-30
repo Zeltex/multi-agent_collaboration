@@ -181,7 +181,8 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 			}
 		}
 		are_probable.push_back(is_probable);
-		if (is_probable && info_entry.goals_size() == 1) {
+		//if (is_probable && info_entry.goals_size() == 1) {
+		if (is_probable) {
 			for (const auto& goal : info_entry.get_goals_iterable()) {
 				normalisation_goals.push_back(goal);
 			}
