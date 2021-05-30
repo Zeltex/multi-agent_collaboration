@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 module1 = Extension('mac_interface',
                     include_dirs = ['multi-agent_collaboration'],
-                    extra_compile_args = ['-std=c++17', '-Ofast'],
+                    extra_compile_args = ['-std=c++17'],
                     sources = ['mac_interface/Mac_interface.cpp',
                                'multi-agent_collaboration/A_Star.cpp',
                                'multi-agent_collaboration/Bayesian_Recogniser.cpp',
