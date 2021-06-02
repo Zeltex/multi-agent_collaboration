@@ -81,11 +81,11 @@ struct Goals {
 		}
 	}
 
-	void update_handoffs(const std::vector<Agent_Id>& handoff_agents) {
+	void update_handoffs(const Agent_Combination& handoff_agents) {
 		assert(handoff_agents.size() == goals.size());
 		size_t goals_size = goals.size();
 		for (size_t i = 0; i < goals_size; ++i) {
-			goals.at(i).handoff_agent = handoff_agents.at(i);
+			goals.at(i).handoff_agent = handoff_agents.get(i);
 		}
 	}
 

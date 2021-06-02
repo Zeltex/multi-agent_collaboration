@@ -56,7 +56,8 @@ Action Planner_Mac::get_next_action(const State& state, bool print_state) {
 	size_t max_tasks = environment.get_number_of_agents();
 	auto info = get_best_collaboration(probable_infos, max_tasks, state, true);
 	if (!info.has_value()) {
-		info = get_best_collaboration(infos, max_tasks, state, false);
+		//info = get_best_collaboration(infos, max_tasks, state, false);
+		info = get_best_collaboration(infos, max_tasks, state, true);
 	}
 
 	std::stringstream buffer3;
@@ -76,7 +77,6 @@ Action Planner_Mac::get_next_action(const State& state, bool print_state) {
 std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths, const std::vector<Recipe>& recipes_in,
 	const State& state) {
 	size_t total_agents = environment.get_number_of_agents();
-	std::vector<Agent_Id> all_agents;
 
 	// Precalculate all recipe combinations
 	std::vector<std::vector<std::vector<Recipe>>> all_recipe_combinations;
@@ -85,14 +85,7 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths,
 		all_recipe_combinations.push_back(get_combinations(recipes_in, i + 1));
 	}
 
-	// Precalculate agent permutations for all agent sizes
-	std::vector<std::vector<std::vector<Agent_Id>>> agent_permutations;
-	for (size_t i = 0; i < total_agents; ++i) {
-		all_agents.push_back({ i });
-	}
-	for (size_t i = 0; i < total_agents; ++i) {
-		agent_permutations.push_back(get_combinations_duplicates<Agent_Id>({ all_agents }, i + 1));
-	}
+	auto agent_permutations = get_handoff_permutations();
 	std::vector<Collaboration_Info> infos;
 
 	auto agent_combinations = get_combinations(total_agents);
@@ -123,13 +116,56 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths,
 						goals.add({ agents, recipe, EMPTY_VAL });
 					}
 
-					auto temp_infos = get_collaboration_permutations(goals, paths, agent_permutations.at(recipes.size() - 1), state);
+					auto temp_infos = get_collaboration_permutations(goals, paths, agent_permutations.get(recipes.size()), state);
 					infos.insert(std::end(infos), std::begin(temp_infos), std::end(temp_infos));
 				}
 			}
 		}
 	}
 	return infos;
+}
+
+Permutations Planner_Mac::get_handoff_permutations() const {
+	std::vector<Agent_Id> all_agents;
+	size_t max_size = environment.get_number_of_agents();
+	for (size_t i = 0; i < environment.get_number_of_agents(); ++i) {
+		all_agents.push_back({ i });
+	}
+
+	Permutations result(max_size);
+	size_t agent_size = all_agents.size();
+	for (size_t current_size = 1; current_size <= max_size; ++current_size) {
+		std::vector<int> counters(current_size, -1);
+		bool done = false;
+		while (!done) {
+			std::vector<Agent_Id> next_permutation;
+			bool valid_permutation = true;
+			std::vector<bool> seen(agent_size, false);
+			for (size_t i = 0; i < counters.size(); i++) {
+				if (counters[i] == -1) {
+					next_permutation.push_back(Agent_Id(EMPTY_VAL));
+				} else {
+					// TODO - Testing without this constraint
+					//if (seen.at(counters[i])) {
+					//	valid_permutation = false;
+					//}
+					seen.at(counters[i]) = true;
+					next_permutation.push_back(all_agents.at(counters[i]));
+				}
+			}
+			if (valid_permutation) {
+				result.insert(next_permutation);
+			}
+
+			// Advance indices
+			size_t index = 0;
+			while (!done && ++counters.at(index) >= agent_size) {
+				counters.at(index++) = -1;
+				done = index >= counters.size();
+			}
+		}
+	}
+	return result;
 }
 
 std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(const std::vector<Collaboration_Info>& infos,
@@ -513,6 +549,7 @@ struct Temp3 {
 	size_t handoff_time;
 	Agent_Id agent;
 	size_t id;
+	Recipe recipe;
 
 	bool operator<(const Temp3& other) const {
 		if (handoff_time != other.handoff_time) handoff_time < other.handoff_time;
@@ -522,9 +559,10 @@ struct Temp3 {
 
 size_t Planner_Mac::get_permutation_length(const Goals& goals, const Paths& paths){
 
-	if (is_agent_abused(goals, paths)) {
-		return EMPTY_VAL;
-	}
+	// TODO - Testing without this constraint
+	//if (is_agent_abused(goals, paths)) {
+	//	return EMPTY_VAL;
+	//}
 
 	// Sort tasks by handoff time
 	std::set<Temp3> sorted;
@@ -534,7 +572,7 @@ size_t Planner_Mac::get_permutation_length(const Goals& goals, const Paths& path
 			return EMPTY_VAL;
 		}
 		auto path = path_opt.value();
-		sorted.insert({ path->size(), path->last_action, goal.handoff_agent, sorted.size() });
+		sorted.insert({ path->size(), path->last_action, goal.handoff_agent, sorted.size(), goal.recipe });
 	}
 
 	// Calculate adjusted handoff time per agent and task
@@ -546,7 +584,11 @@ size_t Planner_Mac::get_permutation_length(const Goals& goals, const Paths& path
 		if (entry.handoff_time != EMPTY_VAL) {
 			// Note the +1's are from index to length conversion
 			handoffs.at(entry.agent.id) += entry.handoff_time + 1;
-			extra_length -= (entry.handoff_time + 1);
+			if (environment.is_type_stationary(entry.recipe.ingredient1)
+				|| environment.is_type_stationary(entry.recipe.ingredient2)) {
+				
+				extra_length -= (entry.handoff_time + 1);
+			}
 		}
 		tasks.insert({ entry.agent, entry.length, extra_length, tasks.size() });
 	}
@@ -633,13 +675,24 @@ std::optional<std::vector<Action_Path>> Planner_Mac::get_permutation_action_path
 }
 
 std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(const Goals& goals_in,
-	const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
+	const Paths& paths, const std::vector<Agent_Combination>& agent_permutations,
 	const State& state) {
 
 	std::vector<Collaboration_Info> infos;
 
 	// Get info on each permutation
 	for (const auto& agent_permutation : agent_permutations) {
+
+		bool invalid_agent = false;
+		for (const auto& agent : agent_permutation) {
+			if (!agent.is_empty() && !goals_in.get_agents().contains(agent)) {
+				invalid_agent = true;
+				break;
+			}
+		}
+		if (invalid_agent) {
+			continue;
+		}
 
 		auto goals = goals_in;
 		goals.update_handoffs(agent_permutation);
@@ -789,12 +842,12 @@ Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collabo
 			
 
 			// Improbable
-			if (backup_result == nullptr) {
-				backup_result = &info;
-			}
+			//if (backup_result == nullptr) {
+			//	backup_result = &info;
+			//}
 		}
 	}
-	if (backup_result != nullptr) return *backup_result;
+	//if (backup_result != nullptr) return *backup_result;
 	return {};
 }
 
@@ -808,62 +861,71 @@ Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State
 		for (size_t i = 0; i < recipe_size; ++i) {
 			const auto& recipe = recipes.at(i);
 
-			if (!ingredients_reachable(recipe, agents, state) || state.items_hoarded(recipe, agents)) {
+			bool reachable1 = false, reachable2 = false;
+			for (const auto& agent : agents) {
+				auto reduced_agents = agents;
+				reduced_agents.remove(agent);
+				if (!reachable1 && ingredient_reachable(recipe.ingredient1, agent, reduced_agents, state)) {
+					reachable1 = true;
+					if (reachable2) break;
+				}
+				if (!reachable2 && ingredient_reachable(recipe.ingredient2, agent, reduced_agents, state)) {
+					reachable2 = true;
+					if (reachable1) break;
+				}
+			}
+			if (!reachable1 || !reachable2) {
 				continue;
 			}
 
-			if (agents.size() == 1) {
-				auto time_start = std::chrono::system_clock::now();
-				auto path = search.search_joint(state, recipe, agents, {}, {}, {});
-				auto time_end = std::chrono::system_clock::now();
 
+			Agent_Combination handoff_agents(Agent_Id(EMPTY_VAL));
+			if (agents.size() > 1) {
+				handoff_agents.add(agents);
+			}
+
+			for (const auto& handoff_agent : handoff_agents) {
+				if (handoff_agent.is_empty()) {
+					bool reachable = false;
+					for (const auto& agent : agents) {
+						auto reduced_agents = agents;
+						reduced_agents.remove(agent);
+						if (ingredients_reachable(recipe, agent, reduced_agents, state)) {
+							reachable = true;
+							break;
+						}
+					}
+					if (!reachable) {
+						continue;
+					}
+
+				}
+
+				auto time_start = std::chrono::system_clock::now();
+				auto path = search.search_joint(state, recipe, agents, handoff_agent, {}, {});
+				auto time_end = std::chrono::system_clock::now();
 				auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 
+				Goal goal(agents, recipe, handoff_agent);
+				Action_Path a_path{ path, goal, state, environment };
 
-				// Trim and insert normal path
-				auto trim_path = path;
-				if (!trim_path.empty()) {
+
+				std::stringstream buffer;
+				buffer << agents.to_string() << "/"
+					<< handoff_agent.to_string() << " : "
+					<< a_path.size() << " ("
+					<< a_path.first_action_string() << "-"
+					<< a_path.last_action_string() << ") : "
+					<< recipe.result_char() << " : "
+					<< diff << std::endl;
+				PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
+
+				if (!path.empty()) {
+
 					Search_Trimmer trim;
-					trim.trim(trim_path, state, environment, recipe);
-
-					Goal goal(agents, recipe, EMPTY_VAL);
-					paths.insert(trim_path, goal, state, environment);
-				}
-
-				// Debug print
-				std::string debug_string = "(";
-				for (const auto& agent : agents.get()) {
-					debug_string += std::to_string(agent.id) + ",";
-				}
-				PRINT(Print_Category::PLANNER, Print_Level::DEBUG, debug_string + ") : " + std::to_string(trim_path.size())
-					+ " : " + recipe.result_char() + " : " + std::to_string(diff) + '\n');
-			} else {
-				for (const auto& handoff_agent : agents.get()) {
-					auto time_start = std::chrono::system_clock::now();
-					auto path = search.search_joint(state, recipe, agents, handoff_agent, {}, {});
-					auto time_end = std::chrono::system_clock::now();
-					auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
-
-					Goal goal(agents, recipe, handoff_agent);
-					Action_Path a_path{ path, goal, state, environment };
-
-
-					std::stringstream buffer;
-					buffer << agents.to_string() << "/"
-						<< handoff_agent.to_string() << " : "
-						<< a_path.size() << " ("
-						<< a_path.first_action_string() << "-"
-						<< a_path.last_action_string() << ") : "
-						<< recipe.result_char() << " : "
-						<< diff << std::endl;
-					PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
-
-					if (!path.empty()) {
-
-						Search_Trimmer trim;
-						trim.trim_forward(path, state, environment, recipe);
-						paths.insert(path, goal, state, environment);
-					}
+					trim.trim_forward(path, state, environment, recipe);
+					//trim.trim(trim_path, state, environment, recipe);
+					paths.insert(path, goal, state, environment);
 				}
 			}
 		}
@@ -878,78 +940,77 @@ void Planner_Mac::update_recogniser(const Paths& paths, const State& state) {
 	}
 	recogniser.update(goal_lengths, state);
 }
+bool Planner_Mac::ingredients_reachable(const Recipe& recipe, const Agent_Id agent, const Agent_Combination& agents, const State& state) const {
+	if (!ingredient_reachable(recipe.ingredient1, agent, agents, state)) return false;
+	return ingredient_reachable(recipe.ingredient2, agent, agents, state);
+}
 
-bool Planner_Mac::ingredients_reachable(const Recipe& recipe, const Agent_Combination& agents, const State& state) const {
-	auto reachables = agent_reachables.find(agents);
+bool Planner_Mac::ingredient_reachable(const Ingredient& ingredient_in, const Agent_Id agent, const Agent_Combination& agents, const State& state) const {
+	auto reachables = agent_reachables.find({ agent, agents });
 	if (reachables == agent_reachables.end()) {
-		std::cerr << "Unknown agent combination" << std::endl;
-		exit(-1);
-	}
-	bool skip1 = false, skip2 = false;
-	for (const auto& agent_entry : agents.get()) {
-		const auto& agent = state.get_agent(agent_entry);
-		if (agent.item.has_value()) {
-			if (agent.item.value() == recipe.ingredient1) {
-				skip1 = true;
-			}
-			if (agent.item.value() == recipe.ingredient2) {
-				skip2 = true;
-			}
-		}
-	}
-	
-	if (!skip1) {
-		for (const auto& location : environment.get_coordinates(state, recipe.ingredient1)) {
-			if (!reachables->second.get(location)) {
-				return false;
-			}
-		}
+		throw std::runtime_error("Unknown agent combination");
+
 	}
 
-	if (!skip2) {
-		for (const auto& location : environment.get_coordinates(state, recipe.ingredient2)) {
-			if (!reachables->second.get(location)) {
-				return false;
-			}
+	const auto& agent_item = state.get_agent(agent).item;
+	if (agent_item.has_value() && agent_item.value() == ingredient_in) {
+		return true;
+	}
+
+	for (const auto& location : environment.get_coordinates(state, ingredient_in, false)) {
+		if (reachables->second.get(location)) {
+			return true;
 		}
 	}
-	return true;
+	return false;
 }
 
 
 void Planner_Mac::initialize_reachables(const State& state) {
 	agent_reachables.clear();
-	auto combinations = get_combinations(state.agents.size());
-	for (const auto& agents : combinations) {
-		Reachables reachables(environment.get_width(), environment.get_height());
+	std::vector<size_t> all_agents;
+	for (size_t i = 0; i < state.agents.size(); ++i) {
+		all_agents.push_back(i);
+	}
 
-		// Initial agent locations
-		std::deque<Coordinate> frontier;
-		for (const auto& agent : agents.get()) {
-			auto location = state.get_location(agent);
-			reachables.set(location, true);
-			frontier.push_back(location);
-		}
+	for (size_t agent = 0; agent < state.agents.size(); ++agent) {
+		auto reduced_agents = all_agents;
+		reduced_agents.erase(reduced_agents.begin() + agent);
 
-		// BFS search
-		while (!frontier.empty()) {
-			auto next = frontier.front();
-			frontier.pop_front();
-			
-			for (const auto& location : environment.get_neighbours(next)) {
-				if (!reachables.get(location)) {
-					reachables.set(location, true);
-					auto blocking_agent = state.get_agent(location);
+		auto combinations = get_combinations(reduced_agents);
+		combinations.push_back({});
+		for (const auto& agents : combinations) {
+			Reachables reachables(environment.get_width(), environment.get_height());
 
-					if (!environment.is_cell_type(location, Cell_Type::WALL)
-						&& (!blocking_agent.has_value() 
-							|| agents.contains(blocking_agent.value()))) {
-						frontier.push_back(location);
+			// Initial agent locations
+			std::deque<Coordinate> frontier;
+			//for (const auto& agent : agents.get()) {
+				auto location = state.get_location(agent);
+				reachables.set(location, true);
+				frontier.push_back(location);
+			//}
+
+			// BFS search
+			while (!frontier.empty()) {
+				auto next = frontier.front();
+				frontier.pop_front();
+
+				for (const auto& location : environment.get_neighbours(next)) {
+					if (!reachables.get(location)) {
+						reachables.set(location, true);
+						auto blocking_agent = state.get_agent(location);
+
+						if (!environment.is_cell_type(location, Cell_Type::WALL)
+							&& (!blocking_agent.has_value()
+								|| agents.contains(blocking_agent.value())
+								|| agent == blocking_agent.value().id)) {
+							frontier.push_back(location);
+						}
 					}
 				}
 			}
+			agent_reachables.insert({ {agent, agents}, reachables });
 		}
-		agent_reachables.insert({ agents, reachables });
 	}
 }
 

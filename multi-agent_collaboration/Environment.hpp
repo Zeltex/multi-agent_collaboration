@@ -21,6 +21,7 @@ struct Location {
 };
 
 struct Agent_Id {
+	Agent_Id() : id(EMPTY_VAL) {};
 	Agent_Id(size_t id) :id(id) {};
 	size_t id;
 	bool operator==(const Agent_Id& other) const {
@@ -34,6 +35,12 @@ struct Agent_Id {
 	}
 	std::string to_string() const {
 		return id == EMPTY_VAL ? "X" : std::to_string(id);
+	}
+	bool is_empty() const {
+		return id == EMPTY_VAL;
+	}
+	bool is_not_empty() const {
+		return !is_empty();
 	}
 };
 
@@ -193,7 +200,7 @@ struct Joint_Action {
 		}
 	}
 
-	bool is_action_non_trivial(Agent_Id agent) const {
+	bool is_not_none(Agent_Id agent) const {
 		assert(actions.size() > agent.id);
 		return actions.at(agent.id).direction != Direction::NONE;
 	}
@@ -272,6 +279,13 @@ struct Agent_Combination {
 
 	void add(Agent_Id agent) {
 		agents.push_back(agent);
+		generate_pretty_print();
+	}
+
+	void add(Agent_Combination agents_in) {
+		for (const auto& agent : agents_in) {
+			agents.push_back(agent);
+		}
 		generate_pretty_print();
 	}
 
@@ -364,6 +378,7 @@ struct Agent_Combination {
 	void remove(Agent_Id agent) {
 		auto it = std::find(agents.begin(), agents.end(), agent);
 		if (it != agents.end())	agents.erase(it);
+		generate_pretty_print();
 	}
 
 	std::vector<Agent_Id>::const_iterator begin() const {
@@ -405,6 +420,7 @@ public:
 	bool			act(State& state, const Joint_Action& action, Print_Level print_level) const;
 	Joint_Action	convert_to_joint_action(const Action& action, Agent_Id agent) const;
 	bool			do_ingredients_lead_to_goal(const Ingredients& ingredients_count) const;
+	bool			is_action_none_nav(const Coordinate& coordinate, const Action& action) const;
 	bool			is_cell_type(const Coordinate& coordinate, const Cell_Type& type) const;
 	bool			is_cell_type(const Coordinate& coordinate, const Direction& direction, const Cell_Type& type) const;
 	bool			is_done(const State& state) const;
@@ -419,7 +435,7 @@ public:
 
 	std::vector<Action>			get_actions(Agent_Id agent) const;
 	const std::vector<Recipe>&	get_all_recipes() const;
-	std::vector<Coordinate>		get_coordinates(const State& state, Ingredient ingredient) const;
+	std::vector<Coordinate>		get_coordinates(const State& state, Ingredient ingredient, bool include_agent_holding) const;
 	size_t						get_height() const;
 	std::vector<Joint_Action>	get_joint_actions(const Agent_Combination& agents) const;
 	std::vector<Location>		get_locations(const State& state, Ingredient ingredient) const;

@@ -18,40 +18,24 @@ free_agents		Agents allowed any move any time
 */
 
 std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
-		Recipe recipe, const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent, 
+		Recipe recipe, const Agent_Combination& agents, Agent_Id handoff_agent, 
 	const std::vector<Joint_Action>& input_actions, const Agent_Combination& free_agents) {
 
 	heuristic.set(recipe.ingredient1, recipe.ingredient2, agents, handoff_agent);
 	PRINT(Print_Category::A_STAR, Print_Level::NOPE, std::string("\n\nStarting search ") 
-		+ recipe.result_char() + " " + agents.to_string() +(handoff_agent.has_value() ? "/" 
-		+ std::to_string(handoff_agent.value().id) : "") + "\n\n");
-
-	Node_Queue frontier;
-	Node_Set visited;
-	Node_Ref nodes;
-
-	Node* goal_node = nullptr;
-	//auto actions = get_actions(agents, handoff_agent.has_value());
+		+ recipe.result_char() + " " + agents.to_string() +(handoff_agent.is_empty() ? "" : "/" 
+		+ std::to_string(handoff_agent.id)) + "\n\n");
+	
 	auto actions = get_actions(agents, false);
-	auto source = original_state;
-	size_t input_action_size = input_actions.size();
-	//source.purge(agents);
+	Search_Info si = initialize_variables(recipe, original_state, handoff_agent, agents);
 
-	initialize_variables(frontier, visited, nodes, source, handoff_agent);
-
-	if (nodes.front().h == EMPTY_VAL) {
-		return {};
-	}
-
-	while (goal_node == nullptr) {
+	while (!si.has_goal_node()) {
 
 		// No possible path
-		auto current_node = get_next_node(frontier);
+		auto current_node = get_next_node(si);
 		if (current_node == nullptr) {
 			return {};
 		}
-
-		//print_current(current_node);
 
 		for (const auto& action : actions) {
 
@@ -60,63 +44,61 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 				continue;
 			}
 
-
 			// Perform action if valid
-			auto [action_valid, new_nodes] = check_and_perform(action, nodes, current_node, handoff_agent);
-			if (!action_valid) {
+			auto new_node = check_and_perform(si, action, current_node);
+			if (new_node == nullptr) {
 				continue;
 			}
 
-			for (auto new_node_it = new_nodes.rbegin(); new_node_it != new_nodes.rend(); ++new_node_it) {
-				auto new_node = *new_node_it;
-				if (new_node == nullptr) {
-					continue;
-				}
-
-				auto visited_it = visited.find(new_node);
-
-				// Existing state
-				if (visited_it != visited.end()) {
-					if (new_node->is_shorter(*visited_it)) {
-						(*visited_it)->valid = false;
-						visited.erase(visited_it);
-						visited.insert(new_node);
-						frontier.push(new_node);
-					} else {
-						assert(&nodes.back() == new_node);
-						nodes.pop_back();
-					}
-
-					// New state
-				} else {
-
-					// Goal state which does NOT satisfy handoff_agent
-					if (is_invalid_goal(new_node, recipe, action, handoff_agent)) {
-						new_node->closed = true;
-
-						// Goal state which DOES satisfy handoff_agent
-					} else if (is_valid_goal(new_node, recipe, action, handoff_agent)) {
-						goal_node = new_node;
-						break;
-
-						// Non-goal state
-					} else {
-						visited.insert(new_node);
-						frontier.push(new_node);
-					}
+			if (process_node(si, new_node, action)) {
+				auto handoff_node = generate_handoff(si, new_node);
+				if (handoff_node != nullptr) {
+					process_node(si, handoff_node, action);
 				}
 			}
 		}
 	}
-	auto result_actions = extract_actions(goal_node);
-	
-	//if (agents.size() == 1 && agents.contains(Agent_Id{ 1 })) {
-	//	for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-	//		print_current(&(*it));
-	//	}
-	//}
+	return extract_actions(si.goal_node);
+}
 
-	return result_actions;
+bool A_Star::process_node(Search_Info& si, Node* node, const Joint_Action& action) const {
+	auto& visited = si.visited;
+	auto& frontier = si.frontier;
+	auto& nodes = si.nodes;
+	auto visited_it = visited.find(node);
+
+	// Existing state
+	if (visited_it != visited.end()) {
+		if (node->is_shorter(*visited_it)) {
+			(*visited_it)->valid = false;
+			visited.erase(visited_it);
+			visited.insert(node);
+			frontier.push(node);
+		} else {
+			assert(&nodes.back() == node);
+			nodes.pop_back();
+			return false;
+		}
+
+		// New state
+	} else {
+
+		// Goal state which does NOT satisfy handoff_agent
+		if (is_invalid_goal(si, node, action)) {
+			node->closed = true;
+			return false;
+
+			// Goal state which DOES satisfy handoff_agent
+		} else if (is_valid_goal(si, node, action)) {
+			si.goal_node = node;
+
+			// Non-goal state
+		} else {
+			visited.insert(node);
+			frontier.push(node);
+		}
+	}
+	return true;
 }
 
 bool A_Star::action_conforms_to_input(const Node* current_node, const std::vector<Joint_Action>& input_actions,
@@ -155,17 +137,17 @@ std::vector<Joint_Action> A_Star::extract_actions(const Node* node) const {
 	return reversed;
 }
 
-bool A_Star::is_invalid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, const std::optional<Agent_Id>& handoff_agent) const {
-	return node->state.contains_item(recipe.result) 
-		&& handoff_agent.has_value() 
-		&& action.is_action_non_trivial(handoff_agent.value());
+bool A_Star::is_invalid_goal(const Search_Info& si, const Node* node, const Joint_Action& action) const {
+	return node->state.contains_item(si.recipe.result) 
+		&& si.handoff_agent.is_not_empty() 
+		&& action.is_not_none(si.handoff_agent);
 }
 
-bool A_Star::is_valid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, const std::optional<Agent_Id>& handoff_agent) const {
-	return node->state.contains_item(recipe.result)
-		&& (!handoff_agent.has_value()
+bool A_Star::is_valid_goal(const Search_Info& si, const Node* node, const Joint_Action& action) const {
+	return node->state.contains_item(si.recipe.result)
+		&& (!si.handoff_agent.is_not_empty()
 			|| (node->has_agent_passed() 
-				&& !action.is_action_non_trivial(handoff_agent.value())));
+				&& !action.is_not_none(si.handoff_agent)));
 }
 
 void A_Star::print_current(const Node* node) const {
@@ -174,35 +156,50 @@ void A_Star::print_current(const Node* node) const {
 	std::cout << std::endl;
 }
 
-std::pair<bool, std::array<Node*, 2>> A_Star::check_and_perform(const Joint_Action& action, Node_Ref& nodes, 
-	const Node* current_node, const std::optional<Agent_Id>& handoff_agent) const {
+Node* A_Star::check_and_perform(Search_Info& si, const Joint_Action& action,
+	const Node* current_node) const {
+	Node_Ref& nodes = si.nodes;
+	auto& handoff_agent = si.handoff_agent;
 	
 	// Useful action from handoff agent after handoff
-	if (current_node->has_agent_passed() 
-		&& action.is_action_valid()
-		&& handoff_agent.has_value() 
-		&& action.is_action_non_trivial(handoff_agent.value())) {
+	if (current_node->has_agent_passed()
+		&& handoff_agent.is_not_empty()
+		&& action.is_not_none(handoff_agent)) {
 
-		return { false, {nullptr, nullptr} };
+		return nullptr;
 	}
 	nodes.emplace_back(current_node, nodes.size());
 	auto new_node = &nodes.back();
 
-	// Handoff action, simply change handoff status
-	if (!action.is_action_valid()) {
-		new_node->action = action;
-		new_node->g = current_node->g;
-		new_node->pass_time = current_node->g;
-		new_node->closed = false;
-		new_node->handoff_first_action = std::min(new_node->g, new_node->handoff_first_action);
-		new_node->calculate_hash();
-		return { true, {new_node, nullptr} };
+
+
+	if (handoff_agent.is_not_empty()) {
+		auto coord = new_node->state.get_location(handoff_agent);
+		if (environment.is_action_none_nav(coord, action.get_action(handoff_agent))) {
+			if (!new_node->can_pass) {
+				new_node->can_pass = true;
+			}
+		}
+	} else {
+		// If no handoff agent, only a single agent is allowed none-navigational actions
+		for (const auto& act : action.actions) {
+			if (act.is_not_none()
+				&& environment.is_action_none_nav(new_node->state.get_location(act.agent), act)) {
+				if (new_node->is_agent_compatible(act.agent)) {
+					new_node->agent = act.agent;
+				} else {
+					nodes.pop_back();
+					return nullptr;
+				}
+
+			}
+		}
 	}
 
 	// Action is illegal or causes no change
 	if (!environment.act(new_node->state, action, Print_Level::NOPE)) {
 		nodes.pop_back();
-		return { false, {nullptr, nullptr} };
+		return nullptr;
 	}
 
 	// Action performed
@@ -210,37 +207,47 @@ std::pair<bool, std::array<Node*, 2>> A_Star::check_and_perform(const Joint_Acti
 	new_node->g += 1;
 	new_node->action_count += get_action_cost(action, handoff_agent);
 	new_node->closed = false;
-	new_node->h = heuristic(new_node->state, handoff_agent);
 
-	if (handoff_agent.has_value() && action.get_action(handoff_agent.value()).is_not_none()) {
+	bool require_handoff = (!new_node->can_pass && handoff_agent.is_not_empty());
+	if (new_node->agent.is_not_empty()) {
+		new_node->h = heuristic(new_node->state, Agent_Combination(new_node->agent), handoff_agent, require_handoff);
+	} else {
+		new_node->h = heuristic(new_node->state, si.agents, handoff_agent, require_handoff);
+	}
+	if (handoff_agent.is_not_empty() && action.get_action(handoff_agent).is_not_none()) {
 		new_node->handoff_first_action = std::min(new_node->g, new_node->handoff_first_action);
 	}
 
 	new_node->calculate_hash();
 
-	Node* pass_node = nullptr;
-	if (!new_node->has_agent_passed()) {
-		nodes.emplace_back(new_node, nodes.size());
-		pass_node = &nodes.back();
-		pass_node->parent = current_node;
-		pass_node->pass_time = new_node->g;
-		pass_node->handoff_first_action = new_node->handoff_first_action;
-	}
-
-	return { true, {new_node, pass_node} };
+	return new_node;
 }
 
-size_t A_Star::get_action_cost(const Joint_Action& joint_action, const std::optional<Agent_Id>& handoff_agent) const {
+Node* A_Star::generate_handoff(Search_Info& si, Node* node) const {
+	auto& nodes = si.nodes;
+	Node* pass_node = nullptr;
+	if (node->can_pass && !node->has_agent_passed()) {
+		nodes.emplace_back(node, nodes.size());
+		pass_node = &nodes.back();
+		pass_node->parent = node->parent;
+		pass_node->pass_time = node->g;
+	}
+	return pass_node;
+}
+
+size_t A_Star::get_action_cost(const Joint_Action& joint_action, const Agent_Id& handoff_agent) const {
 	size_t result = 0;
 	for (size_t agent = 0; agent < joint_action.size(); ++agent) {
-		if (!handoff_agent.has_value() || handoff_agent.value().id != agent) {
+		if (!handoff_agent.is_not_empty() || handoff_agent.id != agent) {
 			result += joint_action.get_action(agent).is_none() ? 0 : 1;
 		}
 	}
 	return result;
 }
 
-void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes, const State& original_state, const std::optional<Agent_Id>& handoff_agent) const {
+Search_Info A_Star::initialize_variables(Recipe& recipe, const State& original_state, const Agent_Id& handoff_agent, const Agent_Combination& agents) const {
+
+	Search_Info si(recipe, handoff_agent, agents);
 
 	constexpr size_t id = 0;
 	constexpr size_t g = 0;
@@ -249,42 +256,39 @@ void A_Star::initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_
 	constexpr bool closed = false;
 	constexpr bool valid = true;
 	constexpr size_t handoff_first_action = EMPTY_VAL;
+	constexpr bool can_pass = false;
+	bool require_handoff = handoff_agent.is_not_empty();
 	size_t pass_time = EMPTY_VAL;
 	Joint_Action action;
-	size_t h = heuristic(original_state, handoff_agent);
+	size_t h = heuristic(original_state, agents, handoff_agent, require_handoff);
+	Agent_Id agent;
 
 	// Standard node
-	nodes.emplace_back(original_state, id, g, h, action_count, pass_time, handoff_first_action, parent, action, closed, valid);
-	auto node = &nodes.back();
+	si.nodes.emplace_back(original_state, id, g, h, action_count, pass_time, can_pass, handoff_first_action, parent, action, closed, valid, agent);
+	auto node = &si.nodes.back();
 	node->calculate_hash();
-	frontier.push(node);
-	visited.insert(node);
+	si.frontier.push(node);
+	si.visited.insert(node);
 
-	// Immediate handoff
-	pass_time = g;
-	nodes.emplace_back(original_state, id, g, h, action_count, pass_time, handoff_first_action, parent, action, closed, valid);
-	node = &nodes.back();
-	node->calculate_hash();
-	frontier.push(node);
-	visited.insert(node);
+	return si;
 }
 
 std::vector<Joint_Action> A_Star::get_actions(const Agent_Combination& agents, bool has_handoff_agent) const {
 	auto actions = environment.get_joint_actions(agents);
-	if (has_handoff_agent) {
-		Joint_Action pass_action;
-		actions.push_back(pass_action);
-	}
+	//if (has_handoff_agent) {
+	//	Joint_Action pass_action;
+	//	actions.push_back(pass_action);
+	//}
 	return actions;
 }
 
-Node* A_Star::get_next_node(Node_Queue& frontier) const {
-	while (!frontier.empty()) {
-		auto current_node = frontier.top();
-		frontier.pop();
+Node* A_Star::get_next_node(Search_Info& si) const {
+	while (!si.frontier.empty()) {
+		auto current_node = si.frontier.top();
+		si.frontier.pop();
 
 		// Exceeded depth limit
-		if (current_node->f() >= depth_limit) {
+		if (current_node->f() >= depth_limit || current_node->h == EMPTY_VAL) {
 			current_node->closed = true;
 			continue;
 		}

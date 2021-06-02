@@ -99,7 +99,7 @@ struct Action_Path {
 	size_t get_first_non_trivial_index(Agent_Id agent) const {
 		size_t index = 0;
 		for (const auto& action : joint_actions) {
-			if (action.is_action_non_trivial(agent)) {
+			if (action.is_not_none(agent)) {
 				return index;
 			}
 			++index;
@@ -198,6 +198,28 @@ struct Paths {
 private:
 	std::deque<Action_Path> handoff_paths;
 	std::map<Goal, Action_Path*> handoff_map;
+};
+
+struct Permutations {
+	Permutations(size_t max_size) : permutations(max_size, std::vector<Agent_Combination>()) {}
+
+	void insert(const std::vector<Agent_Id>& agents) {
+		permutations.at(agents.size() - 1).push_back(Agent_Combination(agents));
+	}
+	void insert(const std::vector<std::vector<Agent_Id>>& agents_list) {
+		for (const auto& agents : agents_list) {
+			permutations.at(agents.size() - 1).push_back(Agent_Combination(agents));
+		}
+	}
+	void insert(const Agent_Combination& agents) {
+		permutations.at(agents.size() - 1).push_back(agents);
+	}
+
+	const std::vector<Agent_Combination>& get(size_t size) {
+		return permutations.at(size - 1);
+	}
+
+	std::vector<std::vector<Agent_Combination>> permutations;
 };
 
 struct Collaboration_Info {
@@ -546,12 +568,15 @@ private:
 		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
 		const State& state);
 	std::vector<Collaboration_Info>			get_collaboration_permutations(const Goals& goals,
-		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
+		const Paths& paths, const std::vector<Agent_Combination>& agent_permutations,
 		const State& state);
+	Permutations							get_handoff_permutations() const;
 	std::optional<std::vector<Action_Path>> get_permutation_action_paths(const Goals& goals,
 		const Paths& paths) const;
 	size_t									get_permutation_length(const Goals& goals, const Paths& paths);
-	bool									ingredients_reachable(const Recipe& recipe, 
+	bool									ingredient_reachable(const Ingredient& ingredient_in, const Agent_Id agent,
+		const Agent_Combination& agents, const State& state) const;
+	bool									ingredients_reachable(const Recipe& recipe, const Agent_Id agent,
 		const Agent_Combination& agents, const State& state) const;
 	void									initialize_reachables(const State& initial_state);
 	void									initialize_solutions();
@@ -569,7 +594,7 @@ private:
 
 	Recogniser recogniser;
 	Search search;
-	std::map<Agent_Combination, Reachables> agent_reachables;
+	std::map<std::pair<Agent_Id, Agent_Combination>, Reachables> agent_reachables;
 	std::map<Recipe_Agents, Solution_History> recipe_solutions;
 	size_t time_step;
 };

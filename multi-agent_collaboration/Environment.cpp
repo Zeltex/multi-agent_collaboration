@@ -667,11 +667,11 @@ std::vector<Location> Environment::get_non_wall_locations(const State& state, In
 }
 
 
-std::vector<Coordinate> Environment::get_coordinates(const State& state, Ingredient ingredient) const {
+std::vector<Coordinate> Environment::get_coordinates(const State& state, Ingredient ingredient, bool include_agent_holding) const {
 	switch (ingredient) {
 	case Ingredient::CUTTING: return cutting_stations;
 	case Ingredient::DELIVERY: return delivery_stations;
-	default: return state.get_coordinates(ingredient);
+	default: return state.get_coordinates(ingredient, include_agent_holding);
 	}
 }
 
@@ -729,4 +729,8 @@ std::vector<Coordinate> Environment::get_neighbours(Coordinate location) const {
 		{location.first + 1, location.second},
 		{location.first, location.second + 1},
 		{location.first - 1, location.second} };
+}
+
+bool Environment::is_action_none_nav(const Coordinate& coordinate, const Action& action) const {
+	return is_cell_type(move_noclip(coordinate, action.direction), Cell_Type::WALL);
 }

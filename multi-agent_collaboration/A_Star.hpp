@@ -31,11 +31,11 @@ struct Node {
 	}
 
 	Node(State state, size_t id, size_t g, size_t h, size_t action_count,
-		size_t pass_time, size_t handoff_first_action, 
-		Node* parent, Joint_Action action, bool closed, bool valid)
+		size_t pass_time, bool can_pass, size_t handoff_first_action,
+		Node* parent, Joint_Action action, bool closed, bool valid, Agent_Id agent)
 		: state(state), id(id), g(g), h(h), action_count(action_count),
-		pass_time(pass_time), handoff_first_action(handoff_first_action),
-		parent(parent), action(action), closed(closed), valid(valid) {};
+		pass_time(pass_time), can_pass(can_pass), handoff_first_action(handoff_first_action),
+		parent(parent), action(action), closed(closed), valid(valid), agent(agent) {};
 	
 	void init(const Node* other) {
 		this->state = other->state;
@@ -48,8 +48,10 @@ struct Node {
 		this->closed = other->closed;
 		this->valid = other->valid;
 		this->pass_time = other->pass_time;
+		this->can_pass = other->can_pass;
 		this->handoff_first_action = other->handoff_first_action;
 		this->hash = EMPTY_VAL;
+		this->agent = other->agent;
 	}
 
 	size_t g;
@@ -59,11 +61,13 @@ struct Node {
 	size_t id;
 	size_t action_count;
 	size_t pass_time;
+	bool can_pass;
 	const Node* parent;
 	Joint_Action action;
 	bool closed;
 	bool valid;
 	size_t handoff_first_action;
+	Agent_Id agent;
 
 	// For debug purposes
 	size_t hash;
@@ -107,6 +111,10 @@ struct Node {
 
 		return false;
 	}
+
+	bool is_agent_compatible(Agent_Id agent) {
+		return this->agent == EMPTY_VAL || this->agent == agent;
+	}
 };
 
 namespace std {
@@ -149,44 +157,60 @@ struct Node_Set_Comparator {
 	}
 };
 
-
 using Node_Queue = std::priority_queue<Node*, std::vector<Node*>, Node_Queue_Comparator>;
 using Node_Set = std::unordered_set<Node*, Node_Hasher, Node_Set_Comparator>;
 using Node_Ref = std::deque<Node>;
+
+struct Search_Info {
+	Search_Info(const Recipe& recipe, const Agent_Id& handoff_agent, const Agent_Combination& agents)
+		: frontier(), visited(), nodes(), goal_node(nullptr), recipe(recipe), 
+		handoff_agent(handoff_agent), agents(agents) {}
+	bool has_goal_node() const {
+		return goal_node != nullptr;
+	}
+
+	Node_Queue frontier;
+	Node_Set visited;
+	Node_Ref nodes;
+	Node* goal_node;
+	Recipe recipe;
+	Agent_Id handoff_agent;
+	Agent_Combination agents;
+};
+
 
 class A_Star : public Search_Method {
 public:
 	A_Star(const Environment& environment, size_t depth_limit);
 	std::vector<Joint_Action> search_joint(const State& state, Recipe recipe, 
-		const Agent_Combination& agents, std::optional<Agent_Id> handoff_agent,
+		const Agent_Combination& agents, Agent_Id handoff_agent,
 		const std::vector<Joint_Action>& input_actions, 
 		const Agent_Combination& free_agents) override;
 private:
-	size_t	get_action_cost(const Joint_Action& action, const std::optional<Agent_Id>& handoff_agent) const;
 	
-	Node*	get_next_node(Node_Queue& frontier) const;
 	
-	void	initialize_variables(Node_Queue& frontier, Node_Set& visited, Node_Ref& nodes,
-		const State& original_state, const std::optional<Agent_Id>& handoff_agent) const;
 	
-	bool	is_invalid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, 
-		const std::optional<Agent_Id>& handoff_agent) const;
+	bool						action_conforms_to_input(const Node* current_node, const std::vector<Joint_Action>& input_actions,
+									const Joint_Action action, const Agent_Combination& agents) const;
+	Node*						check_and_perform(Search_Info& si, const Joint_Action& action, const Node* current_node) const;
+	std::vector<Joint_Action>	extract_actions(const Node* node) const;
+	Node*						generate_handoff(Search_Info& si, Node* node) const;
+	size_t						get_action_cost(const Joint_Action& action, const Agent_Id& handoff_agent) const;
+	std::vector<Joint_Action>	get_actions(const Agent_Combination& agents, bool has_handoff_agent) const;
+	Node*						get_next_node(Search_Info& si) const;
+	Search_Info					initialize_variables(Recipe& recipe, const State& original_state, 
+									const Agent_Id& handoff_agent, const Agent_Combination& agents) const;
+	bool						is_invalid_goal(const Search_Info& si, const Node* node, const Joint_Action& action) const;
+	bool						is_valid_goal(const Search_Info& si, const Node* node, const Joint_Action& action) const;
+	void						print_current(const Node* node) const;
+	bool						process_node(Search_Info& si, Node* node, const Joint_Action& action) const;
 
-	bool	is_valid_goal(const Node* node, const Recipe& recipe, const Joint_Action& action, 
-		const std::optional<Agent_Id>& handoff_agent) const;
 	
-	void	print_current(const Node* node) const;
 	
-	std::vector<Joint_Action> get_actions(const Agent_Combination& agents, 
-		bool has_handoff_agent) const;
 		
-	std::pair<bool, std::array<Node*, 2>> check_and_perform(const Joint_Action& action, Node_Ref& nodes,
-		const Node* current_node, const std::optional<Agent_Id>& handoff_agent) const;
 	
-	std::vector<Joint_Action> extract_actions(const Node* node) const;
 
-	bool action_conforms_to_input(const Node* current_node, const std::vector<Joint_Action>& input_actions,
-		const Joint_Action action, const Agent_Combination& agents) const;
+
 
 	Heuristic heuristic;
 };

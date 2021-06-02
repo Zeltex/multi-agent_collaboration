@@ -77,27 +77,6 @@ bool State::is_wall_occupied(const Coordinate& coord) const {
 	return items.find(coord) != items.end();
 }
 
-bool State::items_hoarded(const Recipe& recipe, const Agent_Combination& available_agents) const {
-	std::vector<Ingredient> items_needed{ recipe.ingredient1, recipe.ingredient2 };
-	for (const auto& item : items) {
-		auto it = std::find(items_needed.begin(), items_needed.end(), item.second);
-		if (it != items_needed.end()) {
-			items_needed.erase(it);
-			if (items_needed.empty()) false;
-		}
-	}
-
-	for (size_t i = 0; i < agents.size(); ++i) {
-		if (agents.at(i).item.has_value()) {
-			if (std::find(items_needed.begin(), items_needed.end(), agents.at(i).item.value()) != items_needed.end()
-				&& !available_agents.contains({ i })) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
 Coordinate State::get_location(Agent_Id agent) const {
 	return agents.at(agent.id).coordinate;
 }
@@ -164,16 +143,18 @@ bool State::operator==(const State& other) const {
 }
 
 
-std::vector<Coordinate> State::get_coordinates(Ingredient ingredient) const {
+std::vector<Coordinate> State::get_coordinates(Ingredient ingredient, bool include_agent_holding) const {
 	std::vector<Coordinate> result;
 	for (const auto& item : items) {
 		if (item.second == ingredient) {
 			result.push_back(item.first);
 		}
 	}
-	for (const auto& agent : agents) {
-		if (agent.item == ingredient) {
-			result.push_back(agent.coordinate);
+	if (include_agent_holding) {
+		for (const auto& agent : agents) {
+			if (agent.item == ingredient) {
+				result.push_back(agent.coordinate);
+			}
 		}
 	}
 	return result;
