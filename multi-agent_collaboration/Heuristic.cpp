@@ -36,6 +36,13 @@ void Heuristic::set(Ingredient ingredient1, Ingredient ingredient2, const Agent_
 	this->handoff_agent = handoff_agent;
 }
 
+std::pair<size_t, Direction> Heuristic::get_dist_direction(Coordinate source, Coordinate dest, size_t walls) const {
+	auto& dist_ref = distances.at(walls).const_at(dest, source);
+	std::pair<size_t, Direction> temp{ dist_ref.g, environment.get_direction(source, dist_ref.parent) };
+	std::cout << source.first << ","<< source.second << " to " << dest.first << "," << dest.second << ": dist " << temp.first << ", direction " << static_cast<char>(temp.second) << std::endl;
+	return { dist_ref.g, environment.get_direction(source, dist_ref.parent) };
+}
+
 size_t Heuristic::get_distance_to_nearest_wall(Coordinate agent_coord, Coordinate blocked, const State& state) const {
 	if (agent_coord != blocked && environment.is_cell_type(agent_coord, Cell_Type::WALL)) {
 		return 0;
@@ -101,69 +108,35 @@ Helper_Agent_Info Heuristic::find_helper(const std::vector<Helper_Agent_Info>& h
 
 // Returns the optimal path length, and total distance agents must move to assist in across-wall transfers
 Helper_Agent_Distance Heuristic::get_helper_agents_distance(Coordinate source, Coordinate destination,
-	const State& state, const Agent_Id handoff_agent, const Agent_Combination& agents_in, const bool& require_handoff_action) const {
+	const State& state, const Agent_Id handoff_agent, const Agent_Combination& agents_in, const bool& require_handoff_action, size_t walls_to_penetrate) const {
 	
 	if (source == destination) {
 		return { 0, false };
 	}
 
 	auto local_agents = agents_in;
-	bool skip_source = false, skip_dest = false;
 	std::vector<Helper_Agent_Info> helpers;
 
-	// TODO - This is not very pretty, this and find_helper should be reorganised
-	// Assign handoff agent to source or dest if we require handoff to have action
-	if (require_handoff_action) {
-		size_t dest_dist = EMPTY_VAL;
-		auto& agent_ref = state.agents.at(handoff_agent.id);
-		auto dest_agent = state.get_agent(destination);
-		if (!environment.is_type_stationary(ingredient1)
-			&& !environment.is_type_stationary(ingredient2)
-			&& (!dest_agent.has_value() || dest_agent.value() == handoff_agent)) {
-			dest_dist = distances.at(0).const_at(agent_ref.coordinate, destination).g;
-		}
-		size_t source_dist = EMPTY_VAL;
-		auto source_agent = state.get_agent(source);
-		if (!source_agent.has_value() || source_agent.value() == handoff_agent) {
-			source_dist = distances.at(0).const_at(agent_ref.coordinate, source).g;
-		}
-
-		if (source_dist == EMPTY_VAL && dest_dist == EMPTY_VAL) {
-			return {};
-		}
-
-		size_t holding_penalty = 0;
-		if (dest_dist != EMPTY_VAL && dest_dist < source_dist) {
-			skip_dest = true;
-			if (agent_ref.item.has_value() && source_dist != 0 && dest_dist != 0) {
-				holding_penalty = get_distance_to_nearest_wall(agent_ref.coordinate, destination, state);
-			}
-			helpers.push_back({ 0, dest_dist });
-		} else {
-			skip_source = true;
-			if (agent_ref.item.has_value() && source_dist != 0 && dest_dist != 0) {
-				holding_penalty = get_distance_to_nearest_wall(agent_ref.coordinate, source, state);
-			}
-			helpers.push_back({ EMPTY_VAL, source_dist, handoff_agent });
-		}
-		local_agents.remove(handoff_agent);
-	}
-
 	// Find helpers
-	auto agent_index = local_agents.size() - 1;
 	auto prev = destination;
 	size_t path_length = 1;
 	bool first = true;
 	while (true) {
-		auto& prev_dist = distances.at(agent_index).const_at(source, prev);
+		auto& prev_dist = distances.at(walls_to_penetrate).const_at(source, prev);
 		if (prev_dist.parent == source) {
-			if (!skip_source) {
-				auto helper = find_helper(helpers, handoff_agent, local_agents, first, state, source, { EMPTY_VAL, EMPTY_VAL }, path_length);
-				if (!helper.has_value()) {
-					return { };
-				}
-				helpers.push_back(helper);
+			auto helper = find_helper(helpers, handoff_agent, local_agents, first, state, source, { EMPTY_VAL, EMPTY_VAL }, path_length);
+			if (!helper.has_value()) {
+				return { };
 			}
+			if (first) {
+				auto agent = state.get_agent(source);
+				if (agent.has_value() && agent.value() != helper.agent) {
+					++helper.agent_to_help;
+				}
+			}
+
+			helpers.push_back(helper);
+
 			break;
 		}
 		if (prev_dist.parent == Coordinate{EMPTY_VAL, EMPTY_VAL}) {
@@ -174,44 +147,38 @@ Helper_Agent_Distance Heuristic::get_helper_agents_distance(Coordinate source, C
 
 		++path_length;
 		if (environment.is_cell_type(next, Cell_Type::WALL)) {
-			if (!first || !skip_dest) {
-				auto helper = find_helper(helpers, handoff_agent, local_agents, first, state, prev, next, path_length);
-				if (!helper.has_value()) {
-					return { };
-				}
-				helpers.push_back(helper);
-				local_agents.remove(helper.agent);
+			auto helper = find_helper(helpers, handoff_agent, local_agents, first, state, prev, next, path_length);
+			if (!helper.has_value()) {
+				return { };
 			}
+			helpers.push_back(helper);
+			local_agents.remove(helper.agent);
+
 			first = false;
 		}
 		prev = next;
 	}
 
 	// Calculate distance from helpers
-	first = true;
+	//first = true;
 	size_t forward_length = path_length;
 	size_t reverse_length = 0;
 	for (auto& helper : helpers) {
-		if (helper.help_to_dest == 0
-			&& !environment.is_type_stationary(ingredient1)
-			&& !environment.is_type_stationary(ingredient2)) {
-			reverse_length = helper.help_to_dest + helper.agent_to_help;
-			assert(helper.help_to_dest <= forward_length);
-			forward_length -= helper.help_to_dest;
+		//if (helper.help_to_dest == 0
+		//	&& !environment.is_type_stationary(ingredient1)
+		//	&& !environment.is_type_stationary(ingredient2)) {
+		//	reverse_length = helper.help_to_dest + helper.agent_to_help;
+		//	assert(helper.help_to_dest <= forward_length);
+		//	forward_length -= helper.help_to_dest;
 
-		} else {
-			// To account for, if we assign the handoff agent at the beginning of this method,
-			//		we do not know what the path length is, so it is set to temporaryt EMPTY_VAL
-			if (helper.help_to_dest == EMPTY_VAL) {
-				helper.help_to_dest = path_length - 1;
-			}
+		//} else {
 
 			int additional_length = (int)helper.agent_to_help - (path_length - helper.help_to_dest);
 			if (additional_length > 0) {
 				forward_length += additional_length;
 			}
-		}
-		first = false;
+		//}
+		//first = false;
 	}
 	bool was_handed_off = helpers.size() > 1;
 	assert((distances.at(agent_index).const_at(source, destination).g == path_length));
@@ -250,27 +217,30 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 		return EMPTY_VAL;
 	}
 
-	if (environment.is_type_stationary(ingredient1) && environment.is_type_stationary(ingredient2)) {
+	if (!environment.is_type_stationary(ingredient1) && !environment.is_type_stationary(ingredient2)) {
 		wall_penalty += std::min(
 			get_distance_to_nearest_wall(location1.coordinate, { EMPTY_VAL, EMPTY_VAL }, state),
 			get_distance_to_nearest_wall(location2.coordinate, { EMPTY_VAL, EMPTY_VAL }, state));
 	}
 
-	if (!environment.is_type_stationary(ingredient1)) {
-		auto had = get_helper_agents_distance(location1.coordinate, location2.coordinate, state, handoff_agent, local_agents, require_handoff_action);
+	for (size_t walls = 0; walls < local_agents.size(); ++walls) {
+		if (!environment.is_type_stationary(ingredient1)) {
+			auto had = get_helper_agents_distance(location1.coordinate, location2.coordinate, state, handoff_agent, local_agents, require_handoff_action, walls);
+			if (had.has_value()) {
+				min_dist = std::min(min_dist, had.dist);
+			}
+		}
+		auto had = get_helper_agents_distance(location2.coordinate, location1.coordinate, state, handoff_agent, local_agents, require_handoff_action, walls);
 		if (had.has_value()) {
-			min_dist = std::min(min_dist, had.dist + wall_penalty);
+			min_dist = std::min(min_dist, had.dist);
 		}
 	}
-	auto had = get_helper_agents_distance(location2.coordinate, location1.coordinate, state, handoff_agent, local_agents, require_handoff_action);
-	if (had.has_value()) {
-		min_dist = std::min(min_dist, had.dist + wall_penalty);
-	}
-	return min_dist;
+	return min_dist + wall_penalty;
 }
 
 // Main heuristic function, setup
-size_t Heuristic::operator()(const State& state, const Agent_Combination& agents, const Agent_Id& handoff_agent, const bool&  require_handoff_action) const {
+size_t Heuristic::operator()(const State& state, const Agent_Combination& agents, const Agent_Id& handoff_agent) const {
+	bool require_handoff_action = false;
 	std::vector<Location> locations1;
 	if (environment.is_type_stationary(ingredient1)) {
 		locations1 = environment.get_locations(state, ingredient1);
@@ -388,8 +358,8 @@ void Heuristic::init() {
 		}
 	}
 
-	print_distances({ 5,2 }, 2);
-	print_distances({ 1,1 }, 2);
-	print_distances({ 2,1 }, 2);
+	//print_distances({ 5,2 }, 2);
+	//print_distances({ 1,1 }, 2);
+	//print_distances({ 2,1 }, 2);
 	//print_distances({ 5,0 }, 2);
 }

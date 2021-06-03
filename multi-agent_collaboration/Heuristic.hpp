@@ -68,13 +68,15 @@ struct Helper_Agent_Info {
 class Heuristic {
 public:
 	Heuristic(Environment environment);
-	size_t operator()(const State& state, const Agent_Combination& agents, const Agent_Id& handoff_agent, const bool& require_handoff_action) const;
+	size_t operator()(const State& state, const Agent_Combination& agents, const Agent_Id& handoff_agent) const;
 	void set(Ingredient ingredient1, Ingredient ingredient2, const Agent_Combination& agents,
 		const Agent_Id& handoff_agent);
+	std::pair<size_t, Direction> get_dist_direction(Coordinate source, Coordinate dest, size_t walls) const;
 
 private:
 	Helper_Agent_Distance  get_helper_agents_distance(Coordinate source, Coordinate destination, const State& state,
-		const Agent_Id handoff_agent, const Agent_Combination& local_agents, const bool& require_handoff_action) const;
+		const Agent_Id handoff_agent, const Agent_Combination& local_agents, const bool& require_handoff_action,
+		size_t walls_to_penetrate) const;
 	
 	size_t get_heuristic_distance(const Location& location1, const Location& location2, const State& state, 
 		const Agent_Id& handoff_agent, const Agent_Combination& local_agents, const bool& require_handoff_action) const;

@@ -41,6 +41,15 @@ void Ingredients::perform_recipe(const Recipe& recipe, const Environment& enviro
 	}
 }
 
+bool Ingredients::have_ingredients(const std::vector<Recipe>& recipes, const Environment& environment) const {
+	for (const auto& recipe : recipes) {
+		if (!have_ingredients(recipe, environment)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 bool Ingredients::have_ingredients(const Recipe& recipe, const Environment& environment) const {
 	return (environment.is_type_stationary(recipe.ingredient1)
 				|| get_count(recipe.ingredient1) > 0)
@@ -733,4 +742,17 @@ std::vector<Coordinate> Environment::get_neighbours(Coordinate location) const {
 
 bool Environment::is_action_none_nav(const Coordinate& coordinate, const Action& action) const {
 	return is_cell_type(move_noclip(coordinate, action.direction), Cell_Type::WALL);
+}
+
+
+Direction Environment::get_direction(const Coordinate& source, const Coordinate& dest) const {
+	switch (((int)dest.first) - source.first) {
+	case -1:return Direction::LEFT;
+	case 1:return Direction::RIGHT;
+	}
+	switch (((int)dest.second) - source.second) {
+	case -1:return Direction::UP;
+	case 1:return Direction::DOWN;
+	}
+	return Direction::NONE;
 }

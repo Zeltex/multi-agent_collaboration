@@ -54,11 +54,11 @@ Action Planner_Mac::get_next_action(const State& state, bool print_state) {
 	auto goal_values = calculate_goal_values(infos);
 	auto probable_infos = calculate_probable_multi_goals(infos, goal_values, state);
 	size_t max_tasks = environment.get_number_of_agents();
-	auto info = get_best_collaboration(probable_infos, max_tasks, state, true);
-	if (!info.has_value()) {
-		//info = get_best_collaboration(infos, max_tasks, state, false);
-		info = get_best_collaboration(infos, max_tasks, state, true);
-	}
+	auto info = get_best_collaboration(infos, probable_infos, state);
+	//if (!info.has_value()) {
+	//	//info = get_best_collaboration(infos, max_tasks, state, false);
+	//	info = get_best_collaboration(infos, max_tasks, state, true);
+	//}
 
 	std::stringstream buffer3;
 	++time_step;
@@ -126,6 +126,8 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths,
 }
 
 Permutations Planner_Mac::get_handoff_permutations() const {
+	// -1 for including none, 0 for not including none
+	int min_index = 0;
 	std::vector<Agent_Id> all_agents;
 	size_t max_size = environment.get_number_of_agents();
 	for (size_t i = 0; i < environment.get_number_of_agents(); ++i) {
@@ -134,8 +136,14 @@ Permutations Planner_Mac::get_handoff_permutations() const {
 
 	Permutations result(max_size);
 	size_t agent_size = all_agents.size();
+
+	// None-handoff for single agent
+	if (min_index > -1) {
+		result.insert(Agent_Combination(Agent_Id(EMPTY_VAL)));
+	}
+
 	for (size_t current_size = 1; current_size <= max_size; ++current_size) {
-		std::vector<int> counters(current_size, -1);
+		std::vector<int> counters(current_size, min_index);
 		bool done = false;
 		while (!done) {
 			std::vector<Agent_Id> next_permutation;
@@ -160,7 +168,7 @@ Permutations Planner_Mac::get_handoff_permutations() const {
 			// Advance indices
 			size_t index = 0;
 			while (!done && ++counters.at(index) >= agent_size) {
-				counters.at(index++) = -1;
+				counters.at(index++) = min_index;
 				done = index >= counters.size();
 			}
 		}
@@ -296,6 +304,9 @@ std::map<Goals, float> Planner_Mac::calculate_goal_values(std::vector<Collaborat
 			goal_values.insert({ goals, entry.value });
 		}
 	}
+	std::sort(infos.begin(), infos.end(), [](const Collaboration_Info& lhs, const Collaboration_Info& rhs) {
+		return lhs.value < rhs.value;
+		});
 	return goal_values;
 }
 
@@ -584,11 +595,11 @@ size_t Planner_Mac::get_permutation_length(const Goals& goals, const Paths& path
 		if (entry.handoff_time != EMPTY_VAL) {
 			// Note the +1's are from index to length conversion
 			handoffs.at(entry.agent.id) += entry.handoff_time + 1;
-			if (environment.is_type_stationary(entry.recipe.ingredient1)
-				|| environment.is_type_stationary(entry.recipe.ingredient2)) {
+			//if (environment.is_type_stationary(entry.recipe.ingredient1)
+			//	|| environment.is_type_stationary(entry.recipe.ingredient2)) {
 				
 				extra_length -= (entry.handoff_time + 1);
-			}
+			//}
 		}
 		tasks.insert({ entry.agent, entry.length, extra_length, tasks.size() });
 	}
@@ -682,16 +693,25 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 
 	// Get info on each permutation
 	for (const auto& agent_permutation : agent_permutations) {
-
-		bool invalid_agent = false;
-		for (const auto& agent : agent_permutation) {
-			if (!agent.is_empty() && !goals_in.get_agents().contains(agent)) {
-				invalid_agent = true;
-				break;
+		if (goals_in.get_agents().size() == 1) {
+			if (agent_permutation != Agent_Combination(Agent_Id(EMPTY_VAL))) {
+				continue;
 			}
-		}
-		if (invalid_agent) {
-			continue;
+		} else {
+			bool invalid_agent = false;
+			for (const auto& agent : agent_permutation) {
+				if (
+					// If we allow none-handoff agents
+					//!agent.is_empty() && 
+					!goals_in.get_agents().contains(agent)) {
+
+					invalid_agent = true;
+					break;
+				}
+			}
+			if (invalid_agent) {
+				continue;
+			}
 		}
 
 		auto goals = goals_in;
@@ -794,61 +814,194 @@ void Planner_Mac::trim_trailing_non_actions(std::vector<Joint_Action>& joint_act
 }
 
 Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
-	const size_t& max_tasks, const State& state, bool track_compatibility) {
+	const std::vector<Collaboration_Info>& probable_infos, const State& state) {
 
-	auto infos_copy = infos;
-	std::sort(infos_copy.begin(), infos_copy.end(), [](const Collaboration_Info& lhs, const Collaboration_Info& rhs) {
-		return lhs.value < rhs.value;
-		});
+	//auto infos_copy = infos;
+	//std::sort(infos_copy.begin(), infos_copy.end(), [](const Collaboration_Info& lhs, const Collaboration_Info& rhs) {
+	//	return lhs.value < rhs.value;
+	//	});
 
 	const Collaboration_Info* backup_result = nullptr;
-
+	//std::map<Agent_Id, size_t> assignments;
+	//for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
+	//	assignments[agent] = EMPTY_VAL;
+	//}
+	// 
+	// Probable
+	Agent_Combination used_agents;
 	auto ingredients = state.get_ingredients_count();
-	for (const auto& info : infos_copy) {
-		if (track_compatibility) {
-			// Probable
-			bool ingredients_available = true;
-			auto new_ingredients = ingredients;
-			for (const auto& goal : info.get_goals()) {
-				if (!new_ingredients.have_ingredients(goal.recipe, environment)) {
-					ingredients_available = false;
-					break;
-				} else {
-					new_ingredients.perform_recipe(goal.recipe, environment);
-				}
-			}
-			if (ingredients_available) {
-				ingredients = new_ingredients;
-				if (info.get_agents().contains(planning_agent)) return info;
-			}
-		} else {
+	for (const auto& info : probable_infos) {
+		auto new_agents = used_agents.get_new_agents(info.get_agents());
+		if (new_agents.empty()) {
+			continue;
+		}
+		auto recipes = info.get_goals().get_recipes();
+		if (!ingredients.have_ingredients(recipes, environment)) {
+			continue;
+		}
 
-			// Improbable, planning_agent is handoff
-			const auto& goals = info.get_goals();
-			const auto& goal = *goals.begin();
-				std::stringstream buffer;
-				buffer << "Considering " << info.to_string() << " with action " << info.next_action.to_string() << " ";
-				if (goals.size() == 1
-					&& goal.handoff_agent == planning_agent) {
-					if (info.next_action.is_not_none()) {
-						buffer << " ACCEPTED\n";
-						PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
-						return info;
-					} else {
-						buffer << " REJECTED\n";
-					}
-				}
-				PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
-			
+		ingredients.perform_recipes(recipes, environment);
+		used_agents.add(new_agents);
+		if (info.get_agents().contains(planning_agent)) return info;
+	}
 
-			// Improbable
-			//if (backup_result == nullptr) {
-			//	backup_result = &info;
-			//}
+	// Improbable
+	for (const auto& info : infos) {
+		if (info.next_action.is_not_none()) {
+			auto recipes = info.get_goals().get_recipes();
+			if (ingredients.have_ingredients(recipes, environment)) {
+				return info;
+			}
+
 		}
 	}
+
+	// Any, we are active
+	for (const auto& info : infos) {
+		auto recipes = info.get_goals().get_recipes();
+		auto& agents = info.get_agents();
+		if (ingredients.have_ingredients(recipes, environment)) {
+
+			// Check if contains relevant goal
+			Goal chosen_goal;
+			if (agents.is_only_agent(planning_agent)) {
+				chosen_goal = *info.get_goals().begin();
+			} else {
+				for (const auto& goal : info.get_goals()) {
+					if (goal.handoff_agent == planning_agent) {
+						chosen_goal = goal;
+						break;
+					}
+				}
+			}
+
+			// If goal found, find direction to reduce distance to nearest ingredient
+			if (chosen_goal.has_value()) {
+				Action best_action;
+				size_t best_dist = EMPTY_VAL;
+				Coordinate agent_location = state.get_agent(planning_agent).coordinate;
+				size_t walls_penetrated = 0;
+
+				// Find best direction, ingredient 1
+				if (!environment.is_type_stationary(chosen_goal.recipe.ingredient1)) {
+					for (const auto& ingredient_location : environment.get_non_wall_locations(state, chosen_goal.recipe.ingredient1)) {
+						auto [dist, direction] = search.get_dist_direction(agent_location, ingredient_location.coordinate, walls_penetrated);
+						if (dist < best_dist || best_dist == EMPTY_VAL) {
+							best_dist = dist;
+							best_action = { direction, planning_agent };
+						}
+					}
+				}
+				// Find best direction, ingredient 2
+				for (const auto& ingredient_location : environment.get_non_wall_locations(state, chosen_goal.recipe.ingredient2)) {
+					auto [dist, direction] = search.get_dist_direction(agent_location, ingredient_location.coordinate, walls_penetrated);
+					if (dist < best_dist || best_dist == EMPTY_VAL) {
+						best_dist = dist;
+						best_action = { direction, planning_agent };
+					}
+				}
+				// Return best
+				if (best_dist != EMPTY_VAL) {
+					auto info_copy = info;
+					info_copy.next_action = best_action;
+					return info_copy;
+				}
+			}
+		}
+	}
+
+
+
+
+	//auto ingredients = state.get_ingredients_count();
+	//for (const auto& info : infos_copy) {
+	//	if (track_compatibility) {
+	//		// Probable
+	//		bool ingredients_available = true;
+	//		bool contains_new_agent = false;
+
+	//		auto new_used_agents = used_agents;
+	//		for (const auto& agent : info.get_agents()) {
+	//			if (!used_agents.contains(agent)) {
+	//				new_used_agents.add(agent);
+	//				contains_new_agent = true;
+	//			}
+	//		}
+
+	//		auto new_ingredients = ingredients;
+	//		for (const auto& goal : info.get_goals()) {
+	//			if (!new_ingredients.have_ingredients(goal.recipe, environment)) {
+	//				ingredients_available = false;
+	//				break;
+	//			} else {
+	//				new_ingredients.perform_recipe(goal.recipe, environment);
+	//			}
+	//		}
+	//		if (ingredients_available && contains_new_agent) {
+	//			ingredients = new_ingredients;
+	//			used_agents = new_used_agents;
+	//			if (info.get_agents().contains(planning_agent)) return info;
+	//		}
+	//	} else {
+
+	//		// Improbable, planning_agent is handoff
+	//		const auto& goals = info.get_goals();
+	//		const auto& goal = *goals.begin();
+	//			std::stringstream buffer;
+	//			buffer << "Considering " << info.to_string() << " with action " << info.next_action.to_string() << " ";
+	//			if (goals.size() == 1
+	//				&& goal.handoff_agent == planning_agent) {
+	//				if (info.next_action.is_not_none()) {
+	//					buffer << " ACCEPTED\n";
+	//					PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
+	//					return info;
+	//				} else {
+	//					buffer << " REJECTED\n";
+	//				}
+	//			}
+	//			PRINT(Print_Category::PLANNER, Print_Level::VERBOSE, buffer.str());
+	//		
+
+	//		// Improbable
+	//		//if (backup_result == nullptr) {
+	//		//	backup_result = &info;
+	//		//}
+	//	}
+	//}
 	//if (backup_result != nullptr) return *backup_result;
 	return {};
+}
+
+bool Planner_Mac::temp(const Agent_Combination& agents, const Agent_Id& handoff_agent, const Recipe& recipe, const State& state) {
+	bool reachable1 = false, reachable2 = false;
+	for (const auto& agent : agents) {
+		if (agent == handoff_agent) continue;
+		auto reduced_agents = agents;
+		reduced_agents.remove(agent);
+		if (!reachable1 && ingredient_reachable(recipe.ingredient1, agent, reduced_agents, state)) {
+			reachable1 = true;
+			if (reachable2) break;
+		}
+		if (!reachable2 && ingredient_reachable(recipe.ingredient2, agent, reduced_agents, state)) {
+			reachable2 = true;
+			if (reachable1) break;
+		}
+	}
+	if (reachable1 && reachable2) {
+		return true;
+	}
+	auto reduced_agents = agents;
+	reduced_agents.remove(handoff_agent);
+	if (reachable2
+		&& !environment.is_type_stationary(recipe.ingredient1) 
+		&& ingredient_reachable(recipe.ingredient1, handoff_agent, reduced_agents, state)) {
+		return true;
+	}
+	if (reachable1
+		&& ingredient_reachable(recipe.ingredient2, handoff_agent, reduced_agents, state)) {
+		return true;
+	}
+	return false;
 }
 
 Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State& state) {
@@ -879,9 +1032,11 @@ Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State
 			}
 
 
-			Agent_Combination handoff_agents(Agent_Id(EMPTY_VAL));
+			Agent_Combination handoff_agents;
 			if (agents.size() > 1) {
 				handoff_agents.add(agents);
+			} else {
+				handoff_agents.add(Agent_Id(EMPTY_VAL));
 			}
 
 			for (const auto& handoff_agent : handoff_agents) {
@@ -899,6 +1054,19 @@ Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State
 						continue;
 					}
 
+				} else {
+					if (!temp(agents, handoff_agent, recipe, state)) {
+						continue;
+					}
+					//auto reduced_agents = agents;
+					//reduced_agents.remove(handoff_agent);
+					//for (const auto& agent : agents) {
+					//	if (ingredient_reachable(recipe.ingredient1, agent, reduced_agents, state)
+					//		|| (environment.is_type_stationary(recipe. ) {
+					//		reachable = true;
+					//		break;
+					//	}
+					//}
 				}
 
 				auto time_start = std::chrono::system_clock::now();

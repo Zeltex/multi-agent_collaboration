@@ -563,7 +563,7 @@ private:
 		const std::vector<Action_Path>& action_paths);
 	Paths									get_all_paths(const std::vector<Recipe>& recipes, const State& state);
 	Collaboration_Info						get_best_collaboration(const std::vector<Collaboration_Info>& infos, 
-		const size_t& max_tasks, const State& state, bool track_compatibility);
+		const std::vector<Collaboration_Info>& probable_infos, const State& state);
 	std::optional<Collaboration_Info>		get_best_permutation(const Goals& goals, 
 		const Paths& paths, const std::vector<std::vector<Agent_Id>>& agent_permutations,
 		const State& state);
@@ -587,6 +587,7 @@ private:
 		const std::map<Goals, float>& goal_values);
 	Paths									perform_new_search(const State& state, const Goal& goal, 
 		const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents);
+	bool									temp(const Agent_Combination& agents, const Agent_Id& handoff_agent, const Recipe& recipe, const State& state);
 	void									trim_trailing_non_actions(std::vector<Joint_Action>& joint_actions, 
 		const Agent_Id& handoff_agent);
 	void									update_recogniser(const Paths& paths, const State& state);

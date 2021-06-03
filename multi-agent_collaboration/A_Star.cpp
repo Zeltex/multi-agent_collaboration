@@ -61,6 +61,10 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 	return extract_actions(si.goal_node);
 }
 
+std::pair<size_t, Direction> A_Star::get_dist_direction(Coordinate source, Coordinate dest, size_t walls) {
+	return heuristic.get_dist_direction(source, dest, walls);
+}
+
 bool A_Star::process_node(Search_Info& si, Node* node, const Joint_Action& action) const {
 	auto& visited = si.visited;
 	auto& frontier = si.frontier;
@@ -171,31 +175,6 @@ Node* A_Star::check_and_perform(Search_Info& si, const Joint_Action& action,
 	nodes.emplace_back(current_node, nodes.size());
 	auto new_node = &nodes.back();
 
-
-
-	if (handoff_agent.is_not_empty()) {
-		auto coord = new_node->state.get_location(handoff_agent);
-		if (environment.is_action_none_nav(coord, action.get_action(handoff_agent))) {
-			if (!new_node->can_pass) {
-				new_node->can_pass = true;
-			}
-		}
-	} else {
-		// If no handoff agent, only a single agent is allowed none-navigational actions
-		for (const auto& act : action.actions) {
-			if (act.is_not_none()
-				&& environment.is_action_none_nav(new_node->state.get_location(act.agent), act)) {
-				if (new_node->is_agent_compatible(act.agent)) {
-					new_node->agent = act.agent;
-				} else {
-					nodes.pop_back();
-					return nullptr;
-				}
-
-			}
-		}
-	}
-
 	// Action is illegal or causes no change
 	if (!environment.act(new_node->state, action, Print_Level::NOPE)) {
 		nodes.pop_back();
@@ -208,12 +187,8 @@ Node* A_Star::check_and_perform(Search_Info& si, const Joint_Action& action,
 	new_node->action_count += get_action_cost(action, handoff_agent);
 	new_node->closed = false;
 
-	bool require_handoff = (!new_node->can_pass && handoff_agent.is_not_empty());
-	if (new_node->agent.is_not_empty()) {
-		new_node->h = heuristic(new_node->state, Agent_Combination(new_node->agent), handoff_agent, require_handoff);
-	} else {
-		new_node->h = heuristic(new_node->state, si.agents, handoff_agent, require_handoff);
-	}
+	new_node->h = heuristic(new_node->state, si.agents, handoff_agent);
+	
 	if (handoff_agent.is_not_empty() && action.get_action(handoff_agent).is_not_none()) {
 		new_node->handoff_first_action = std::min(new_node->g, new_node->handoff_first_action);
 	}
@@ -226,7 +201,7 @@ Node* A_Star::check_and_perform(Search_Info& si, const Joint_Action& action,
 Node* A_Star::generate_handoff(Search_Info& si, Node* node) const {
 	auto& nodes = si.nodes;
 	Node* pass_node = nullptr;
-	if (node->can_pass && !node->has_agent_passed()) {
+	if (!node->has_agent_passed()) {
 		nodes.emplace_back(node, nodes.size());
 		pass_node = &nodes.back();
 		pass_node->parent = node->parent;
@@ -257,10 +232,10 @@ Search_Info A_Star::initialize_variables(Recipe& recipe, const State& original_s
 	constexpr bool valid = true;
 	constexpr size_t handoff_first_action = EMPTY_VAL;
 	constexpr bool can_pass = false;
-	bool require_handoff = handoff_agent.is_not_empty();
+	bool require_handoff = false;
 	size_t pass_time = EMPTY_VAL;
 	Joint_Action action;
-	size_t h = heuristic(original_state, agents, handoff_agent, require_handoff);
+	size_t h = heuristic(original_state, agents, handoff_agent);
 	Agent_Id agent;
 
 	// Standard node
@@ -270,16 +245,18 @@ Search_Info A_Star::initialize_variables(Recipe& recipe, const State& original_s
 	si.frontier.push(node);
 	si.visited.insert(node);
 
+	// Immediate handoff
+	auto handoff_node = generate_handoff(si, node);
+	if (handoff_node != nullptr) {
+		si.frontier.push(handoff_node);
+		si.visited.insert(handoff_node);
+	}
+
 	return si;
 }
 
 std::vector<Joint_Action> A_Star::get_actions(const Agent_Combination& agents, bool has_handoff_agent) const {
-	auto actions = environment.get_joint_actions(agents);
-	//if (has_handoff_agent) {
-	//	Joint_Action pass_action;
-	//	actions.push_back(pass_action);
-	//}
-	return actions;
+	return environment.get_joint_actions(agents);
 }
 
 Node* A_Star::get_next_node(Search_Info& si) const {

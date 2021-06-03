@@ -115,6 +115,7 @@ struct Ingredients {
 
 	void perform_recipes(const std::vector<Recipe>& recipes, const Environment& environment);
 	void perform_recipe(const Recipe& recipe, const Environment& environment);
+	bool have_ingredients(const std::vector<Recipe>& recipes, const Environment& environment) const;
 	bool have_ingredients(const Recipe& recipe, const Environment& environment) const;
 
 	size_t get_count(Ingredient ingredient) const {
@@ -389,6 +390,21 @@ struct Agent_Combination {
 		return agents.end();
 	}
 
+	Agent_Combination get_new_agents(Agent_Combination other) const {
+		std::vector<Agent_Id> result;
+		for (const auto& agent : other) {
+			if (!this->contains(agent)) {
+				result.push_back(agent);
+			}
+		}
+		return Agent_Combination(result);
+	}
+
+	bool is_only_agent(Agent_Id agent) const {
+		return agents.size() == 1 && agents.at(0) == agent;
+	}
+
+
 private:
 	void generate_pretty_print() {
 		pretty_print = "(";
@@ -436,6 +452,7 @@ public:
 	std::vector<Action>			get_actions(Agent_Id agent) const;
 	const std::vector<Recipe>&	get_all_recipes() const;
 	std::vector<Coordinate>		get_coordinates(const State& state, Ingredient ingredient, bool include_agent_holding) const;
+	Direction					get_direction(const Coordinate& source, const Coordinate& dest) const;
 	size_t						get_height() const;
 	std::vector<Joint_Action>	get_joint_actions(const Agent_Combination& agents) const;
 	std::vector<Location>		get_locations(const State& state, Ingredient ingredient) const;

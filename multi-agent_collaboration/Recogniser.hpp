@@ -64,6 +64,10 @@ struct Goal {
 		return !(*this == other);
 	}
 
+	bool has_value() const {
+		return !(agents.empty() && recipe == EMPTY_RECIPE);
+	}
+
 	Agent_Combination agents;
 	Recipe recipe;
 	Agent_Id handoff_agent;
@@ -144,6 +148,14 @@ struct Goals {
 		for (auto& goal : goals) {
 			goal.handoff_agent = EMPTY_VAL;
 		}
+	}
+
+	std::vector<Recipe> get_recipes() const {
+		std::vector<Recipe> recipes;
+		for (const auto& goal : goals) {
+			recipes.push_back(goal.recipe);
+		}
+		return recipes;
 	}
 
 private:

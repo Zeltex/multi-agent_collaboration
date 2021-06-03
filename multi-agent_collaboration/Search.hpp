@@ -61,6 +61,7 @@ public:
 	virtual std::vector<Joint_Action> search_joint(const State& state,
 		Recipe recipe, const Agent_Combination& agents, Agent_Id handoff_agent,
 		const std::vector<Joint_Action>& input_actions, const Agent_Combination& free_agents) = 0;
+	virtual std::pair<size_t, Direction> get_dist_direction(Coordinate source, Coordinate dest, size_t walls) = 0;
 protected:
 		template<typename T>
 		std::vector<Joint_Action> extract_actions(size_t goal_id, const std::vector<T>& states) const;
@@ -78,6 +79,9 @@ public:
 		const Agent_Combination& free_agents) {
 		
 		return search_method->search_joint(state, recipe, agents, handoff_agent, input_actions, free_agents);
+	}
+	std::pair<size_t, Direction> get_dist_direction(Coordinate source, Coordinate dest, size_t walls) {
+		return search_method->get_dist_direction(source, dest, walls);
 	}
 private:
 	std::unique_ptr<Search_Method> search_method;

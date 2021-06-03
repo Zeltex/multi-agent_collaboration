@@ -53,3 +53,7 @@ std::vector<Joint_Action> BFS::search_joint(const State& state,
 	}
 	return extract_actions<Search_Joint_State>(goal_id, path);
 }
+
+std::pair<size_t, Direction> BFS::get_dist_direction(Coordinate source, Coordinate dest, size_t walls) {
+	throw std::runtime_error("Not implemented");
+}

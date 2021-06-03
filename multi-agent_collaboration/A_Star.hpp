@@ -186,6 +186,7 @@ public:
 		const Agent_Combination& agents, Agent_Id handoff_agent,
 		const std::vector<Joint_Action>& input_actions, 
 		const Agent_Combination& free_agents) override;
+	std::pair<size_t, Direction> get_dist_direction(Coordinate source, Coordinate dest, size_t walls) override;
 private:
 	
 	
