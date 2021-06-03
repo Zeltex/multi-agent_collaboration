@@ -201,11 +201,18 @@ Node* A_Star::check_and_perform(Search_Info& si, const Joint_Action& action,
 Node* A_Star::generate_handoff(Search_Info& si, Node* node) const {
 	auto& nodes = si.nodes;
 	Node* pass_node = nullptr;
-	if (!node->has_agent_passed()) {
-		nodes.emplace_back(node, nodes.size());
-		pass_node = &nodes.back();
-		pass_node->parent = node->parent;
-		pass_node->pass_time = node->g;
+	if (si.handoff_agent.is_not_empty() 
+		&& !node->has_agent_passed()) {
+		auto item = node->state.get_agent(si.handoff_agent).item;
+		if (!item.has_value()
+			|| (item.value() != si.recipe.ingredient1
+				&& item.value() != si.recipe.ingredient2)) {
+
+			nodes.emplace_back(node, nodes.size());
+			pass_node = &nodes.back();
+			pass_node->parent = node->parent;
+			pass_node->pass_time = node->g;
+		}
 	}
 	return pass_node;
 }

@@ -101,9 +101,7 @@ Helper_Agent_Info Heuristic::find_helper(const std::vector<Helper_Agent_Info>& h
 			min_agent = agent_id;
 		}
 	}
-	// The -1 is to account for the wall (i.e. path_length is linked to next, 
-	// but helper spot is linked to prev)
-	return { path_length - 1, min_dist, min_agent};
+	return { path_length, min_dist, min_agent};
 }
 
 // Returns the optimal path length, and total distance agents must move to assist in across-wall transfers
@@ -181,7 +179,7 @@ Helper_Agent_Distance Heuristic::get_helper_agents_distance(Coordinate source, C
 		//first = false;
 	}
 	bool was_handed_off = helpers.size() > 1;
-	assert((distances.at(agent_index).const_at(source, destination).g == path_length));
+	assert((distances.at(walls_to_penetrate).const_at(source, destination).g == path_length));
 	return { std::max(forward_length, reverse_length), was_handed_off };
 }
 
@@ -219,8 +217,8 @@ size_t Heuristic::get_heuristic_distance(const Location& location1, const Locati
 
 	if (!environment.is_type_stationary(ingredient1) && !environment.is_type_stationary(ingredient2)) {
 		wall_penalty += std::min(
-			get_distance_to_nearest_wall(location1.coordinate, { EMPTY_VAL, EMPTY_VAL }, state),
-			get_distance_to_nearest_wall(location2.coordinate, { EMPTY_VAL, EMPTY_VAL }, state));
+			get_distance_to_nearest_wall(location1.original, { EMPTY_VAL, EMPTY_VAL }, state),
+			get_distance_to_nearest_wall(location2.original, { EMPTY_VAL, EMPTY_VAL }, state));
 	}
 
 	for (size_t walls = 0; walls < local_agents.size(); ++walls) {
@@ -331,7 +329,7 @@ void Heuristic::init() {
 					if (recorded_dist.g == EMPTY_VAL 
 						|| current.dist + 1 < recorded_dist.g
 						|| (current.dist +1 == recorded_dist.g 
-							&& recorded_dist.wall_g < current.wall_g)) {
+							&& recorded_dist.wall_g > current.wall_g)) {
 						
 						recorded_dist.g = current.dist + 1;
 						recorded_dist.parent = current.coord;
@@ -358,8 +356,7 @@ void Heuristic::init() {
 		}
 	}
 
-	//print_distances({ 5,2 }, 2);
-	//print_distances({ 1,1 }, 2);
-	//print_distances({ 2,1 }, 2);
+	print_distances({ 5,5 }, 2);
+	print_distances({ 1,1 }, 2);
 	//print_distances({ 5,0 }, 2);
 }
