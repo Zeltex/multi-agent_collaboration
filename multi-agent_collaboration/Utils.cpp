@@ -91,4 +91,6 @@ std::default_random_engine random_engine;
 void set_random_seed(size_t seed) {
 	random_seed = seed;
 	random_engine = std::default_random_engine(seed);
+	PRINT(Print_Category::UTILS, Print_Level::DEBUG, "Setting seed " +
+		std::to_string(seed) + "\n");
 }

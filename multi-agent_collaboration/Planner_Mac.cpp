@@ -23,7 +23,7 @@ constexpr auto INITIAL_DEPTH_LIMIT = 30;
 constexpr auto GAMMA = 1.01;
 constexpr auto GAMMA2 = 1.02;
 
-Planner_Mac::Planner_Mac(Environment environment, Agent_Id planning_agent, const State& initial_state)
+Planner_Mac::Planner_Mac(Environment environment, Agent_Id planning_agent, const State& initial_state, size_t seed)
 	: Planner_Impl(environment, planning_agent), time_step(0), 
 		search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT)),
 		recogniser(std::make_unique<Sliding_Recogniser>(environment, initial_state)) {

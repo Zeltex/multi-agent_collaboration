@@ -13,7 +13,8 @@ enum class Print_Category {
 	A_STAR=1,
 	PLANNER=1,
 	ENVIRONMENT=1,
-	RECOGNISER=1
+	RECOGNISER=1,
+	UTILS=1,
 };
 
 #ifndef PRINT_LEVEL

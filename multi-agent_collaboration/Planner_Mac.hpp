@@ -605,7 +605,7 @@ class Planner_Mac : public Planner_Impl {
 
 
 public:
-	Planner_Mac(Environment environment, Agent_Id agent, const State& initial_state);
+	Planner_Mac(Environment environment, Agent_Id agent, const State& initial_state, size_t seed=0);
 	virtual Action get_next_action(const State& state, bool print_state) override;
 
 private:
