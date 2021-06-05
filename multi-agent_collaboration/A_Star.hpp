@@ -185,25 +185,26 @@ public:
 	std::vector<Joint_Action> search_joint(const State& state, Recipe recipe, 
 		const Agent_Combination& agents, Agent_Id handoff_agent,
 		const std::vector<Joint_Action>& input_actions, 
-		const Agent_Combination& free_agents) override;
+		const Agent_Combination& free_agents, const Action& initial_action = {}) override;
 	std::pair<size_t, Direction> get_dist_direction(Coordinate source, Coordinate dest, size_t walls) override;
 private:
 	
 	
 	
 	bool						action_conforms_to_input(const Node* current_node, const std::vector<Joint_Action>& input_actions,
-									const Joint_Action action, const Agent_Combination& agents) const;
-	Node*						check_and_perform(Search_Info& si, const Joint_Action& action, const Node* current_node) const;
+									const Joint_Action action, const Agent_Combination& agents, const Action& initial_action) const;
+	Node*						check_and_perform(Search_Info& si, const Joint_Action& action, const Node* current_node, const std::vector<Joint_Action>& input_actions) const;
 	std::vector<Joint_Action>	extract_actions(const Node* node) const;
-	Node*						generate_handoff(Search_Info& si, Node* node) const;
+	Node*						generate_handoff(Search_Info& si, Node* node, const std::vector<Joint_Action>& input_actions) const;
 	size_t						get_action_cost(const Joint_Action& action, const Agent_Id& handoff_agent) const;
 	std::vector<Joint_Action>	get_actions(const Agent_Combination& agents, bool has_handoff_agent) const;
 	Node*						get_next_node(Search_Info& si) const;
 	Search_Info					initialize_variables(Recipe& recipe, const State& original_state, 
-									const Agent_Id& handoff_agent, const Agent_Combination& agents) const;
+									const Agent_Id& handoff_agent, const Agent_Combination& agents, const std::vector<Joint_Action>& input_actions) const;
 	bool						is_invalid_goal(const Search_Info& si, const Node* node, const Joint_Action& action) const;
 	bool						is_valid_goal(const Search_Info& si, const Node* node, const Joint_Action& action) const;
 	void						print_current(const Node* node) const;
+	void						print_goal(const Node* node) const;
 	bool						process_node(Search_Info& si, Node* node, const Joint_Action& action) const;
 
 	

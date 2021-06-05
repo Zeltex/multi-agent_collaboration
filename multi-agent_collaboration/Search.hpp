@@ -60,7 +60,7 @@ public:
 	Search_Method(const Environment& environment, size_t depth_limit) : environment(environment), depth_limit(depth_limit) {}
 	virtual std::vector<Joint_Action> search_joint(const State& state,
 		Recipe recipe, const Agent_Combination& agents, Agent_Id handoff_agent,
-		const std::vector<Joint_Action>& input_actions, const Agent_Combination& free_agents) = 0;
+		const std::vector<Joint_Action>& input_actions, const Agent_Combination& free_agents, const Action& initial_action) = 0;
 	virtual std::pair<size_t, Direction> get_dist_direction(Coordinate source, Coordinate dest, size_t walls) = 0;
 protected:
 		template<typename T>
@@ -76,9 +76,9 @@ public:
 	Search(std::unique_ptr<Search_Method> search_method) : search_method(std::move(search_method)) {};
 	std::vector<Joint_Action> search_joint(const State& state, Recipe recipe, const Agent_Combination& agents, 
 		Agent_Id handoff_agent, const std::vector<Joint_Action>& input_actions, 
-		const Agent_Combination& free_agents) {
+		const Agent_Combination& free_agents, const Action& initial_action) {
 		
-		return search_method->search_joint(state, recipe, agents, handoff_agent, input_actions, free_agents);
+		return search_method->search_joint(state, recipe, agents, handoff_agent, input_actions, free_agents, initial_action);
 	}
 	std::pair<size_t, Direction> get_dist_direction(Coordinate source, Coordinate dest, size_t walls) {
 		return search_method->get_dist_direction(source, dest, walls);

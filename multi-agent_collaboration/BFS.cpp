@@ -8,13 +8,17 @@
 
 std::vector<Joint_Action> BFS::search_joint(const State& state,
 	Recipe recipe, const Agent_Combination& agents, Agent_Id handoff_agent,
-	const std::vector<Joint_Action>& input_actions, const Agent_Combination& free_agents) {
+	const std::vector<Joint_Action>& input_actions, const Agent_Combination& free_agents, const Action& initial_action) {
 
 	if (handoff_agent.is_not_empty()) {
 		throw std::runtime_error("Handoff agent not supported for bfs");
 	}
 
-	Search_Joint_State dummy(state, { { } }, 0, 0);
+	if (initial_action.has_value()) {
+		throw std::runtime_error("Initial action not supported for bfs");
+	}
+
+	Search_Joint_State dummy(state, { }, 0, 0);
 	std::unordered_set<Search_Joint_State> visited;
 	std::vector<Search_Joint_State> path;
 	std::deque<Search_Joint_State> frontier;

@@ -11,6 +11,7 @@
 #include <cassert>
 #include <set>
 #include <algorithm>
+#include <sstream>
 
 using Coordinate = std::pair<size_t, size_t> ;
 
@@ -170,7 +171,7 @@ struct Action {
 	}
 
 	std::string to_string() const {
-		return std::string(1, static_cast<char>(direction)) + ":" + std::to_string(agent.id);
+		return std::string(1, static_cast<char>(direction)) + "" + std::to_string(agent.id);
 	}
 
 	bool is_not_none() const {
@@ -179,93 +180,9 @@ struct Action {
 	bool is_none() const {
 		return direction == Direction::NONE;
 	}
-};
 
-struct Joint_Action {
-	Joint_Action() : actions() {};
-	Joint_Action(size_t number_of_agents) : actions() {
-		for (size_t action_index = 0; action_index < number_of_agents; ++action_index) {
-			actions.emplace_back(Direction::NONE, Agent_Id{ action_index });
-		}
-	};
-	Joint_Action(std::vector<Action> actions) : actions(actions) {};
-
-	std::vector<Action> actions;
-	
-	void update_action(Agent_Id agent, Direction direction) {
-		for (auto& action : actions) {
-			if (action.agent == agent) {
-				action.direction = direction;
-				return;
-			}
-		}
-	}
-
-	bool is_not_none(Agent_Id agent) const {
-		assert(actions.size() > agent.id);
-		return actions.at(agent.id).direction != Direction::NONE;
-	}
-
-	Action get_action(const Agent_Id& agent) const {
-		if (actions.size() <= agent.id) {
-			std::cerr << "Attempting to get action for agent " << agent.id << ", but action length is " << actions.size() << std::endl;
-			for (const auto& action : actions) {
-				std::cerr << action.to_string() << " ";
-			}
-			std::cerr << std::endl;
-			throw std::runtime_error("Invalid get action");
-		}
-		return actions.at(agent.id);
-	}
-
-	// false if handoff action
-	bool is_action_valid() const {
-		return !actions.empty();
-	}
-
-	size_t size() const {
-		return actions.size();
-	}
-};
-
-struct Agent {
-	Agent(Coordinate coordinate)
-		: coordinate(coordinate), item() {};
-	Agent(Coordinate coordinate, Ingredient item) 
-		: coordinate(coordinate), item(item) {};
-	Coordinate coordinate;
-	std::optional<Ingredient> item;
-	bool operator== (const Agent& other) const {
-		if (coordinate != other.coordinate) return false;
-		if (item != other.item) return false;
-		return true;
-	}
-	bool operator!= (const Agent& other) const {
-		return !(*this == other);
-	}
-	bool operator< (const Agent& other) const {
-		if (coordinate < other.coordinate) return true;
-		if (coordinate > other.coordinate) return false;
-		if (item.has_value() && !other.item.has_value()) return true;
-		if (!item.has_value() && other.item.has_value()) return true;
-		if (item.value() < other.item.value()) return true;
-		if (item.value() > other.item.value()) return false;
-		return false;
-	}
-	void clear_item() {
-		item = {};
-	}
-	void set_item(Ingredient item) {
-		this->item = item;
-	}
-	void move_to(Coordinate coordinate) {
-		this->coordinate = coordinate;
-	}
-	void print_compact(Agent_Id id) const {
-		std::cout << "(" << id.id << ", " << coordinate.first << ", " << coordinate.second << ") ";
-		if (item.has_value()) {
-			std::cout << "(" << static_cast<char>(item.value()) << ", " << coordinate.first << ", " << coordinate.second << ") ";
-		}
+	bool has_value() const {
+		return agent != EMPTY_VAL;
 	}
 };
 
@@ -417,6 +334,116 @@ private:
 		pretty_print += ")";
 	}
 };
+
+struct Joint_Action {
+	Joint_Action() : actions() {};
+	//Joint_Action(size_t number_of_agents) : actions() {
+	//	for (size_t action_index = 0; action_index < number_of_agents; ++action_index) {
+	//		actions.emplace_back(Direction::NONE, Agent_Id{ action_index });
+	//	}
+	//};
+	Joint_Action(const Agent_Combination& agents) : actions() {
+		for (const auto& agent : agents) {
+			actions.emplace_back(Direction::NONE, agent);
+		}
+	}
+	Joint_Action(std::vector<Action> actions) : actions(actions) {};
+
+	std::vector<Action> actions;
+	
+	void update_action(Agent_Id agent, Direction direction) {
+		for (auto& action : actions) {
+			if (action.agent == agent) {
+				action.direction = direction;
+				return;
+			}
+		}
+		std::stringstream buffer;
+		buffer << "Unknown agent " << agent.id << "\n";
+		throw std::runtime_error(buffer.str());
+	}
+
+	bool is_not_none(Agent_Id agent) const {
+		assert(actions.size() > agent.id);
+		return actions.at(agent.id).direction != Direction::NONE;
+	}
+
+	Action get_action(const Agent_Id& agent) const {
+		for (auto& action : actions) {
+			if (action.agent == agent) {
+				return action;
+			}
+		}
+		std::stringstream buffer;
+		buffer << "Unknown agent " << agent.id << "\n";
+		throw std::runtime_error(buffer.str());
+	}
+
+	// false if handoff action
+	bool is_action_valid() const {
+		return !actions.empty();
+	}
+
+	size_t size() const {
+		return actions.size();
+	}
+
+	std::string to_string() const{
+		bool first = true;
+		std::stringstream buffer;
+		for (const auto& action : actions) {
+			if (!first) {
+				buffer << ":";
+			}
+			first = false;
+			buffer << action.to_string();
+		}
+		return buffer.str();
+	}
+};
+
+struct Agent {
+	Agent(Coordinate coordinate)
+		: coordinate(coordinate), item() {};
+	Agent(Coordinate coordinate, Ingredient item) 
+		: coordinate(coordinate), item(item) {};
+	Coordinate coordinate;
+	std::optional<Ingredient> item;
+	bool operator== (const Agent& other) const {
+		if (coordinate != other.coordinate) return false;
+		if (item != other.item) return false;
+		return true;
+	}
+	bool operator!= (const Agent& other) const {
+		return !(*this == other);
+	}
+	bool operator< (const Agent& other) const {
+		if (coordinate < other.coordinate) return true;
+		if (coordinate > other.coordinate) return false;
+		if (item.has_value() && !other.item.has_value()) return true;
+		if (!item.has_value() && other.item.has_value()) return true;
+		if (item.value() < other.item.value()) return true;
+		if (item.value() > other.item.value()) return false;
+		return false;
+	}
+	void clear_item() {
+		item = {};
+	}
+	void set_item(Ingredient item) {
+		this->item = item;
+	}
+	void move_to(Coordinate coordinate) {
+		this->coordinate = coordinate;
+	}
+	void print_compact(Agent_Id id) const {
+		std::cout << "(" << id.id << ", " << coordinate.first << ", " << coordinate.second << ") ";
+		if (item.has_value()) {
+			std::cout << "(" << static_cast<char>(item.value()) << ", " << coordinate.first << ", " << coordinate.second << ") ";
+		}
+	}
+};
+
+
 
 
 struct State;

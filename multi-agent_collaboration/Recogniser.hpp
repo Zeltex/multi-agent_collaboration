@@ -68,6 +68,12 @@ struct Goal {
 		return !(agents.empty() && recipe == EMPTY_RECIPE);
 	}
 
+	std::string to_string() const {
+		std::stringstream buffer;
+		buffer << recipe.result_char() << ":" << agents.to_string_raw() << ":" << handoff_agent.id;
+		return buffer.str();
+	}
+
 	Agent_Combination agents;
 	Recipe recipe;
 	Agent_Id handoff_agent;

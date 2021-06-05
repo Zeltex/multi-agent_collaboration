@@ -32,15 +32,33 @@ struct Action_Path {
 		first_action = 0;
 		auto coordinate = initial_coordinate;
 		while (true) {
-			coordinate = environment.move_noclip(coordinate, joint_actions.at(first_action).get_action(handoff_agent).direction);
-			if (environment.is_cell_type(coordinate, Cell_Type::WALL)) {
-				break;
+			auto direction = joint_actions.at(first_action).get_action(handoff_agent).direction;
+			auto coordinate_noclip = environment.move_noclip(coordinate, direction);
+
+			// New useful definition
+			if (environment.is_cell_type(coordinate_noclip, Cell_Type::WALL)) {
+				auto item = state.get_ingredient_at_position(coordinate_noclip);
+				auto agent_item = state.get_agent(handoff_agent).item;
+				if (item.has_value()
+					&& (item.value() == goal.recipe.ingredient1
+						|| item.value() == goal.recipe.ingredient2)) {
+					break;
+				} else if (agent_item.has_value()
+					&& (agent_item.value() == goal.recipe.ingredient1
+						|| agent_item.value() == goal.recipe.ingredient2)) {
+					break;
+				}
 			}
+
+			//if (environment.is_cell_type(coordinate, Cell_Type::WALL)) {
+			//	break;
+			//}
 			if (first_action == joint_actions.size() - 1) {
 				first_action = EMPTY_VAL;
 				break;
 			}
 			++first_action;
+			coordinate = environment.move(coordinate, direction);
 		}
 
 		// Note last action which interacts with a wall 
@@ -50,9 +68,24 @@ struct Action_Path {
 		size_t action_counter = 0;
 		while (action_counter < joint_actions.size()) {
 			const auto& direction = joint_actions.at(action_counter).get_action(handoff_agent).direction;
+
+			// New useful definition
 			if (environment.is_cell_type(environment.move_noclip(coordinate, direction), Cell_Type::WALL)) {
-				last_action = action_counter;
+				auto item = state.get_ingredient_at_position(environment.move_noclip(coordinate, direction));
+				auto agent_item = state.get_agent(handoff_agent).item;
+				if (item.has_value()
+					&& (item.value() == goal.recipe.ingredient1
+						|| item.value() == goal.recipe.ingredient2)) {
+					last_action = action_counter;
+				} else if (agent_item.has_value()
+					&& (agent_item.value() == goal.recipe.ingredient1
+						|| agent_item.value() == goal.recipe.ingredient2)) {
+					last_action = action_counter;;
+				}
 			}
+			//if (environment.is_cell_type(environment.move_noclip(coordinate, direction), Cell_Type::WALL)) {
+			//	last_action = action_counter;
+			//}
 
 			coordinate = environment.move(coordinate, direction);
 			++action_counter;
@@ -224,15 +257,20 @@ struct Permutations {
 
 struct Collaboration_Info {
 	Collaboration_Info() : length(EMPTY_VAL), 
-		next_action(), value(EMPTY_VAL), goals() {};
+		next_action(), value(EMPTY_VAL), goals(), chosen_goal(), path_length(EMPTY_VAL) {};
 
 	//Collaboration_Info(size_t length, Agent_Combination combination, const std::vector<Recipe> recipes,
 	//	Action next_action, Agent_Combination permutation)
 	//	: length(length), 
 	//		next_action(next_action), value(EMPTY_VAL), goals() {};
 
-	Collaboration_Info(size_t length, const Goals& goals, const Action& next_action)
-		: length(length), goals(goals), next_action(next_action) {}
+	Collaboration_Info(size_t length, const Goals& goals, const Action& next_action, 
+		Goal chosen_goal, size_t path_length)
+		: length(length), goals(goals), next_action(next_action),
+		chosen_goal(chosen_goal), path_length(path_length), value(EMPTY_VAL) {}
+
+	//Collaboration_Info(size_t length, const Goals& goals, const Action& next_action)
+	//	: length(length), goals(goals), next_action(next_action) {}
 
 	std::string to_string() const {
 		if (goals.has_same_agents()) {
@@ -281,6 +319,8 @@ struct Collaboration_Info {
 	Action next_action;
 	size_t length;
 	float value;
+	Goal chosen_goal;
+	size_t path_length;
 	
 private:
 	Goals goals;
@@ -533,6 +573,33 @@ struct Temp {
 	}
 };
 
+struct Goal_Agents {
+	Agent_Combination get(Goal goal) {
+		return data[goal];
+	}
+	Goal get_goal(Agent_Id agent) {
+		for (const auto& [goal, agents]  : data) {
+
+		}
+	}
+	void add(Goal goal, Agent_Combination agents) {
+		data[goal].add(agents);
+	}
+	void add(Goal goal, Agent_Id agent) {
+		data[goal].add(agent);
+	}
+	bool empty(Goal goal) const {
+		return data.find(goal) == data.end();
+	}
+	void set_chosen_goal(Goal goal) {
+		chosen_goal = goal;
+	}
+	Goal get_chosen_goal() {
+		return chosen_goal;
+	}
+	std::map<Goal, Agent_Combination> data;
+	Goal chosen_goal;
+};
 
 class Planner_Mac : public Planner_Impl {
 
@@ -554,9 +621,9 @@ private:
 		const std::vector<Recipe>& recipes, const Paths& paths, const Agent_Combination& agents,
 		const size_t& best_length);
 	std::pair<std::vector<Joint_Action>, 
-		std::map<Recipe, Agent_Combination>>get_actions_from_permutation(
+		Goal_Agents>						get_actions_from_permutation(
 		const Goals& goals, const Paths& paths, const State& state);
-	std::pair<std::vector<Action>, Recipe>	get_actions_from_permutation_inner(const Goals& goals,
+	std::pair<std::vector<Action>, Goal>	get_actions_from_permutation_inner(const Goals& goals,
 		const Agent_Id& acting_agent, const Paths& paths, const State& state);
 	std::vector<std::set<Temp>>				get_agent_handoff_infos( 
 		const Agent_Combination& agents, const std::vector<Agent_Id>& agent_permutation, 
@@ -574,6 +641,7 @@ private:
 	std::optional<std::vector<Action_Path>> get_permutation_action_paths(const Goals& goals,
 		const Paths& paths) const;
 	size_t									get_permutation_length(const Goals& goals, const Paths& paths);
+	Action									get_random_good_action(const Collaboration_Info& info, const Paths& paths, const State& state);
 	bool									ingredient_reachable(const Ingredient& ingredient_in, const Agent_Id agent,
 		const Agent_Combination& agents, const State& state) const;
 	bool									ingredients_reachable(const Recipe& recipe, const Agent_Id agent,
@@ -586,7 +654,7 @@ private:
 	bool									is_agent_subset_faster(const Collaboration_Info& info, 
 		const std::map<Goals, float>& goal_values);
 	Paths									perform_new_search(const State& state, const Goal& goal, 
-		const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents);
+		const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents, const Action& initial_action = {});
 	bool									temp(const Agent_Combination& agents, const Agent_Id& handoff_agent, const Recipe& recipe, const State& state);
 	void									trim_trailing_non_actions(std::vector<Joint_Action>& joint_actions, 
 		const Agent_Id& handoff_agent);

@@ -21,6 +21,10 @@ void flush_log(const std::string& file_name) {
 	buffer.str(std::string());
 }
 
+bool is_print_allowed(Print_Level level) {
+	return PRINT_LEVEL <= level;
+}
+
 void print(Print_Level level, const std::string& msg) {
 	if (level == PRINT_LEVEL) {
 		if (save_to_log) {
@@ -42,7 +46,7 @@ void print(Print_Category category, const std::string& msg) {
 }
 
 void print(Print_Category category, Print_Level level, const std::string& msg) {
-	if (static_cast<size_t>(category) == 1 && PRINT_LEVEL <= level) {
+	if (static_cast<size_t>(category) == 1 && is_print_allowed(level)) {
 		if (save_to_log) {
 			buffer << msg;
 		} else {

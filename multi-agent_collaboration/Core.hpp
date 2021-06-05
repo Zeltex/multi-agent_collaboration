@@ -20,7 +20,7 @@ enum class Print_Category {
 #define PRINT_LEVEL Print_Level::DEBUG
 #endif
 
-
+bool is_print_allowed(Print_Level level);
 void print(Print_Level level, const std::string& msg);
 void print(Print_Category category, const std::string& msg);
 void print(Print_Category category, Print_Level level, const std::string& msg);

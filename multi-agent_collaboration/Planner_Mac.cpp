@@ -27,7 +27,7 @@ Planner_Mac::Planner_Mac(Environment environment, Agent_Id planning_agent, const
 	: Planner_Impl(environment, planning_agent), time_step(0), 
 		search(std::make_unique<A_Star>(environment, INITIAL_DEPTH_LIMIT)),
 		recogniser(std::make_unique<Sliding_Recogniser>(environment, initial_state)) {
-
+	set_random_seed(0);
 	initialize_reachables(initial_state);
 	initialize_solutions();
 }
@@ -62,16 +62,141 @@ Action Planner_Mac::get_next_action(const State& state, bool print_state) {
 
 	std::stringstream buffer3;
 	++time_step;
+	Action result_action{};
+	if (info.has_value()
+		&& info.chosen_goal.has_value()
+		&& info.next_action.is_not_none()) {
+		result_action = get_random_good_action(info, paths, state);
+	}
+
 	if (info.has_value()) {
 		buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action "
-			<< info.next_action.to_string() << "\n";
+			<< result_action.to_string() << "\n";
 		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
-		return info.next_action;
+		return result_action;
+
+	//if (info.has_value()) {
+	//	buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action "
+	//		<< info.next_action.to_string() << "\n";
+	//	PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
+	//	return info.next_action;
 	} else {
 		buffer3 << "Agent " << planning_agent.id << " did not find relevant action\n";
 		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer3.str());
 		return Action{ Direction::NONE, {planning_agent } };
 	}
+}
+
+Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const Paths& paths_in, const State& state) {
+
+	auto& goals = info.get_goals();
+
+	std::vector<Action> result_actions;
+	size_t result_length = HIGH_INIT_VAL;
+	size_t result_path_length = HIGH_INIT_VAL;
+	//size_t original_path_length = paths_in.get_handoff(info.chosen_goal).value()->size();
+
+	for (const auto& action : environment.get_actions(planning_agent)) {
+		if (action.is_none()) {
+			continue;
+		}
+		auto paths = perform_new_search(state, info.chosen_goal, paths_in, {}, {}, action);
+		if (paths.empty()) {
+			continue;
+		}
+		
+
+		size_t length = get_permutation_length(goals, paths);
+		if (length == EMPTY_VAL) {
+			continue;
+		}
+		//if (path_length > info.path_length) {
+		//	continue;
+		//}
+
+		// Get conflict info
+		auto [original_joint_actions, goal_agents] = get_actions_from_permutation(goals, paths, state);
+
+		if (is_conflict_in_permutation(state, original_joint_actions)) {
+
+			// Perform collision avoidance search
+			size_t best_length = HIGH_INIT_VAL;
+			size_t best_path_length = HIGH_INIT_VAL;
+			Collaboration_Info best_collaboration;
+			for (const auto& goal : goals) {
+
+				// Skip if no agent chose to act on this recipe
+				if (goal_agents.empty(goal)) {
+					continue;
+				}
+
+				auto joint_actions = original_joint_actions;
+				trim_trailing_non_actions(joint_actions, goal.handoff_agent);
+
+				// Perform new search for one recipe
+				auto new_paths = perform_new_search(state, goal, paths, joint_actions, goal_agents.get(goal), action);
+				if (new_paths.empty()) {
+					continue;
+				}
+
+				// Get info using the new search
+				size_t new_length = get_permutation_length(goals, new_paths);
+				size_t path_length = new_paths.get_handoff(info.chosen_goal).value()->size();
+
+				// Check if best collision avoidance search so far
+				// TODO - Not sure if should introduce randomness between equal choices of collision avoidance
+				if (new_length < best_length || (new_length == best_length && path_length < best_path_length)) {
+					auto [joint_actions, goal_agents] = get_actions_from_permutation(goals, new_paths, state);
+
+					if (!is_conflict_in_permutation(state, joint_actions)) {
+						//Action planning_agent_action = joint_actions.at(0).get_action(planning_agent);
+						Action planning_agent_action = action;
+						best_length = new_length;
+						best_path_length = path_length;
+						auto chosen_goal = goal_agents.get_chosen_goal();
+						best_collaboration = { new_length, goals, planning_agent_action,  chosen_goal, new_paths.get_handoff(chosen_goal).value()->size()};
+					}
+				}
+			}
+			if (best_length != HIGH_INIT_VAL) {
+				//if (best_length < result_length) {
+				if (best_length < result_length || (best_length == result_length && best_path_length < result_path_length)) {
+					result_length = best_length;
+					result_path_length = best_path_length;
+					result_actions.clear();
+				}
+				//if (best_length == result_length) {
+				if (best_length == result_length && best_path_length == result_path_length) {
+					result_actions.push_back(best_collaboration.next_action);
+				}
+			}
+
+			// Return unmodified entry
+		} else {
+			size_t path_length = paths.get_handoff(info.chosen_goal).value()->size();
+
+			//if (length < result_length) {
+			if (length < result_length || (length == result_length && path_length < result_path_length)) {
+				result_length = length;
+				result_path_length = path_length;
+				result_actions.clear();
+			}
+			//if (length == result_length) {
+			if (length == result_length && path_length == result_path_length) {
+				//Action planning_agent_action = original_joint_actions.at(0).get_action(planning_agent);
+				Action planning_agent_action = action;
+				result_actions.push_back(planning_agent_action);
+			}
+		}
+	}
+
+	auto result_action = get_random<Action>(result_actions);
+	if (result_action != info.next_action) {
+		std::stringstream buffer;
+		buffer << "Changed from " << info.next_action.to_string() << " to " << result_action.to_string() << " for goal " << info.chosen_goal.to_string() << "\n";
+		PRINT(Print_Category::PLANNER, Print_Level::DEBUG, buffer.str());
+	}
+	return result_action;
 }
 
 std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths, const std::vector<Recipe>& recipes_in,
@@ -106,7 +231,7 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths,
 					if (info.has_value()) {
 						auto& info_val = info.value();
 						Collaboration_Info result { info_val->length(), goal,
-							info_val->get_next_action(planning_agent) };
+							info_val->get_next_action(planning_agent), goal, paths.get_handoff(goal).value()->size() };
 
 						infos.push_back(result);
 					}
@@ -338,31 +463,37 @@ bool Planner_Mac::is_conflict_in_permutation(const State& initial_state, const s
 }
 
 
-std::pair<std::vector<Joint_Action>, std::map<Recipe, Agent_Combination>> Planner_Mac::get_actions_from_permutation(
+std::pair<std::vector<Joint_Action>, Goal_Agents> Planner_Mac::get_actions_from_permutation(
 	const Goals& goals, const Paths& paths, const State& state) {
 
-	std::map<Recipe, Agent_Combination> agent_recipes;
-	std::vector<Joint_Action> joint_actions(action_trace_length, goals.get_agents().size());
+	Goal_Agents goal_agents;
+	std::vector<Joint_Action> joint_actions(action_trace_length, goals.get_agents());
 
 	for (const auto& agent : goals.get_agents()) {
-		auto [actions, recipe] = get_actions_from_permutation_inner(goals, agent, paths, state);
-		agent_recipes[recipe].add(agent);
+		auto [actions, goal] = get_actions_from_permutation_inner(goals, agent, paths, state);
+		goal_agents.add(goal, agent);
+
+		if (agent == planning_agent) {
+			goal_agents.set_chosen_goal(goal);
+		}
 
 		for (size_t action_index = 0; action_index < actions.size(); ++action_index) {
 			joint_actions.at(action_index).update_action(agent, actions.at(action_index).direction);
 		}
 	}
-	return { joint_actions, agent_recipes };
+	return { joint_actions, goal_agents };
 }
 
-std::pair<std::vector<Action>, Recipe> Planner_Mac::get_actions_from_permutation_inner(const Goals& goals,
+std::pair<std::vector<Action>, Goal> Planner_Mac::get_actions_from_permutation_inner(const Goals& goals,
 	const Agent_Id& acting_agent, const Paths& paths, const State& state) {
 
 	size_t backup_first_action = HIGH_INIT_VAL;
 	const Action_Path* backup_path = nullptr;
+	const Goal* backup_goal = nullptr;
 
 	//size_t recipes_size = action_paths.size();
 	const Action_Path* result_path = nullptr;
+	const Goal* chosen_goal = nullptr;
 
 	size_t best_handoff = EMPTY_VAL;
 	size_t agent_index = EMPTY_VAL;
@@ -375,6 +506,7 @@ std::pair<std::vector<Action>, Recipe> Planner_Mac::get_actions_from_permutation
 
 				best_handoff = path->last_action;
 				result_path = path;
+				chosen_goal = &goal;
 			}
 		}
 	}
@@ -392,6 +524,7 @@ std::pair<std::vector<Action>, Recipe> Planner_Mac::get_actions_from_permutation
 				&& probability > highest_prob) {
 
 				result_path = path;
+				chosen_goal = &goal;
 				highest_prob = probability;
 			}
 
@@ -399,12 +532,14 @@ std::pair<std::vector<Action>, Recipe> Planner_Mac::get_actions_from_permutation
 			if (index != EMPTY_VAL && index < backup_first_action) {
 				backup_first_action = index;
 				backup_path = path;
+				backup_goal = &goal;
 			}
 		}
 	}
 	
 	if (result_path == nullptr && backup_path != nullptr) {
 		result_path = backup_path;
+		chosen_goal = backup_goal;
 	}
 
 	// Extract actions if found
@@ -423,9 +558,9 @@ std::pair<std::vector<Action>, Recipe> Planner_Mac::get_actions_from_permutation
 			++action_index;
 		}
 
-		return { result, result_path->recipe };
+		return { result, *chosen_goal };
 	} else {
-		return { {}, EMPTY_RECIPE };
+		return { {}, {} };
 	}
 
 }
@@ -592,7 +727,14 @@ size_t Planner_Mac::get_permutation_length(const Goals& goals, const Paths& path
 	std::set<Temp2> tasks;
 	for (const auto& entry : sorted) {
 		size_t extra_length = entry.length;
+		size_t total_length = entry.length;
 		if (entry.handoff_time != EMPTY_VAL) {
+			auto& handoff_ref = handoffs.at(entry.agent.id);
+
+			extra_length += handoff_ref;
+			total_length += handoff_ref;
+
+
 			// Note the +1's are from index to length conversion
 			handoffs.at(entry.agent.id) += entry.handoff_time + 1;
 			//if (environment.is_type_stationary(entry.recipe.ingredient1)
@@ -601,7 +743,7 @@ size_t Planner_Mac::get_permutation_length(const Goals& goals, const Paths& path
 				extra_length -= (entry.handoff_time + 1);
 			//}
 		}
-		tasks.insert({ entry.agent, entry.length, extra_length, tasks.size() });
+		tasks.insert({ entry.agent, total_length, extra_length, tasks.size() });
 	}
 
 	// Distribute task completion time across agents
@@ -723,7 +865,7 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 		}
 
 		// Get conflict info
-		auto [original_joint_actions, agent_recipes] = get_actions_from_permutation(goals, paths, state);
+		auto [original_joint_actions, goal_agents] = get_actions_from_permutation(goals, paths, state);
 
 		if (is_conflict_in_permutation(state, original_joint_actions)) {
 
@@ -733,7 +875,7 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 			for (const auto& goal : goals) {
 
 				// Skip if no agent chose to act on this recipe
-				if (agent_recipes.find(goal.recipe) == agent_recipes.end()) {
+				if (goal_agents.empty(goal)) {
 					continue;
 				}
 
@@ -741,7 +883,7 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 				trim_trailing_non_actions(joint_actions, goal.handoff_agent);
 
 				// Perform new search for one recipe
-				auto new_paths = perform_new_search(state, goal, paths, joint_actions, agent_recipes.at(goal.recipe));
+				auto new_paths = perform_new_search(state, goal, paths, joint_actions, goal_agents.get(goal));
 				if (new_paths.empty()) {
 					continue;
 				}
@@ -752,12 +894,17 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 				// Check if best collision avoidance search so far
 				// TODO - Not sure if should introduce randomness between equal choices of collision avoidance
 				if (new_length < best_length) {
-					auto [joint_actions, agent_recipes] = get_actions_from_permutation(goals, new_paths, state);
+					auto [joint_actions, goal_agents] = get_actions_from_permutation(goals, new_paths, state);
 
 					if (!is_conflict_in_permutation(state, joint_actions)) {
 						Action planning_agent_action = joint_actions.at(0).get_action(planning_agent);
 						best_length = new_length;
-						best_collaboration = { new_length, goals, planning_agent_action };
+						auto chosen_goal = goal_agents.get_chosen_goal();
+						size_t path_length = EMPTY_VAL;
+						if (chosen_goal.has_value()) {
+							path_length = paths.get_handoff(chosen_goal).value()->size();
+						}
+						best_collaboration = { new_length, goals, planning_agent_action, chosen_goal, path_length };
 					}
 				}
 			}
@@ -768,14 +915,22 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 		// Return unmodified entry
 		} else {
 			Action planning_agent_action = original_joint_actions.at(0).get_action(planning_agent);
-			infos.push_back(Collaboration_Info(length, goals, planning_agent_action));
+			auto chosen_goal = goal_agents.get_chosen_goal();
+			auto path_length = EMPTY_VAL;
+			if (chosen_goal.has_value()) {
+				path_length = paths.get_handoff(chosen_goal).value()->size();
+			}
+			infos.push_back(Collaboration_Info(length, goals, planning_agent_action, chosen_goal, path_length));
 		}
 	}
 	return infos;
 }
 
-Paths Planner_Mac::perform_new_search(const State& state, const Goal& goal, const Paths& paths, const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents) {
-	auto new_path = search.search_joint(state, goal.recipe, goal.agents, goal.handoff_agent, joint_actions, acting_agents);
+Paths Planner_Mac::perform_new_search(const State& state, const Goal& goal, const Paths& paths, 
+	const std::vector<Joint_Action>& joint_actions, const Agent_Combination& acting_agents, const Action& initial_action) {
+
+
+	auto new_path = search.search_joint(state, goal.recipe, goal.agents, goal.handoff_agent, joint_actions, acting_agents, initial_action);
 	if (new_path.empty()) {
 		return {};
 	}
@@ -1070,7 +1225,7 @@ Paths Planner_Mac::get_all_paths(const std::vector<Recipe>& recipes, const State
 				}
 
 				auto time_start = std::chrono::system_clock::now();
-				auto path = search.search_joint(state, recipe, agents, handoff_agent, {}, {});
+				auto path = search.search_joint(state, recipe, agents, handoff_agent, {}, {}, {});
 				auto time_end = std::chrono::system_clock::now();
 				auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 
