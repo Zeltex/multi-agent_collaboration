@@ -63,14 +63,12 @@ Action Planner_Mac::get_next_action(const State& state, bool print_state) {
 	std::stringstream buffer3;
 	++time_step;
 	Action result_action{};
-//	if (info.has_value()
-//		&& info.chosen_goal.has_value()
-//		&& info.next_action.is_not_none()) {
-//		result_action = get_random_good_action(info, paths, state);
-//	}
-        if (info.has_value()) {
-            result_action = info.next_action;
-        }
+	if (info.has_value()
+		&& info.chosen_goal.has_value()
+		&& info.next_action.is_not_none()) {
+		result_action = get_random_good_action(info, paths, state);
+	}
+
 	if (info.has_value()) {
 		buffer3 << "Agent " << planning_agent.id << " chose " << info.to_string() << " action "
 			<< result_action.to_string() << "\n";
