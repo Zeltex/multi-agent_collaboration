@@ -187,12 +187,8 @@ Node* A_Star::check_and_perform(Search_Info& si, const Joint_Action& action,
 	new_node->g += 1;
 	new_node->action_count += get_action_cost(action, handoff_agent);
 	new_node->closed = false;
-	//if (new_node->g > input_actions.size()) {
-		new_node->h = heuristic(new_node->state, si.agents, handoff_agent);
-	//} else {
-	//	new_node->h = 0;
-	//}
-	
+	new_node->h = heuristic(new_node->state, si.agents, handoff_agent);
+
 	if (handoff_agent.is_not_empty() && action.get_action(handoff_agent).is_not_none()) {
 		new_node->handoff_first_action = std::min(new_node->g, new_node->handoff_first_action);
 	}
@@ -247,9 +243,7 @@ Search_Info A_Star::initialize_variables(Recipe& recipe, const State& original_s
 	size_t pass_time = EMPTY_VAL;
 	Joint_Action action;
 	size_t h = 0;
-	//if (input_actions.empty()) {
-		h = heuristic(original_state, agents, handoff_agent);
-	//}
+	h = heuristic(original_state, agents, handoff_agent);
 	Agent_Id agent;
 
 	// Standard node

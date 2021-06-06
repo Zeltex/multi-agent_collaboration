@@ -55,10 +55,6 @@ Action Planner_Mac::get_next_action(const State& state, bool print_state) {
 	auto probable_infos = calculate_probable_multi_goals(infos, goal_values, state);
 	size_t max_tasks = environment.get_number_of_agents();
 	auto info = get_best_collaboration(infos, probable_infos, state);
-	//if (!info.has_value()) {
-	//	//info = get_best_collaboration(infos, max_tasks, state, false);
-	//	info = get_best_collaboration(infos, max_tasks, state, true);
-	//}
 
 	std::stringstream buffer3;
 	++time_step;
@@ -97,9 +93,9 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 	//size_t original_path_length = paths_in.get_handoff(info.chosen_goal).value()->size();
 
 	for (const auto& action : environment.get_actions(planning_agent)) {
-		if (action.is_none()) {
-			continue;
-		}
+		//if (action.is_none()) {
+		//	continue;
+		//}
 		auto paths = perform_new_search(state, info.chosen_goal, paths_in, {}, {}, action);
 		if (paths.empty()) {
 			continue;
