@@ -160,8 +160,8 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 					result_path_length = best_path_length;
 					result_actions.clear();
 				}
-				//if (best_length == result_length) {
-				if (best_length == result_length && best_path_length == result_path_length) {
+				if (best_length == result_length) {
+				//if (best_length == result_length && best_path_length == result_path_length) {
 					result_actions.push_back(best_collaboration.next_action);
 				}
 			}
