@@ -93,9 +93,9 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 	//size_t original_path_length = paths_in.get_handoff(info.chosen_goal).value()->size();
 
 	for (const auto& action : environment.get_actions(planning_agent)) {
-		//if (action.is_none()) {
-		//	continue;
-		//}
+		if (action.is_none()) {
+			continue;
+		}
 		auto paths = perform_new_search(state, info.chosen_goal, paths_in, {}, {}, action);
 		if (paths.empty()) {
 			continue;
@@ -140,7 +140,6 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 				size_t path_length = new_paths.get_handoff(info.chosen_goal).value()->size();
 
 				// Check if best collision avoidance search so far
-				// TODO - Not sure if should introduce randomness between equal choices of collision avoidance
 				if (new_length < best_length || (new_length == best_length && path_length < best_path_length)) {
 					auto [joint_actions, goal_agents] = get_actions_from_permutation(goals, new_paths, state);
 
@@ -155,8 +154,8 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 				}
 			}
 			if (best_length != HIGH_INIT_VAL) {
-				//if (best_length < result_length) {
-				if (best_length < result_length || (best_length == result_length && best_path_length < result_path_length)) {
+				if (best_length < result_length) {
+				//if (best_length < result_length || (best_length == result_length && best_path_length < result_path_length)) {
 					result_length = best_length;
 					result_path_length = best_path_length;
 					result_actions.clear();
@@ -171,14 +170,14 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 		} else {
 			size_t path_length = paths.get_handoff(info.chosen_goal).value()->size();
 
-			//if (length < result_length) {
-			if (length < result_length || (length == result_length && path_length < result_path_length)) {
+			if (length < result_length) {
+			//if (length < result_length || (length == result_length && path_length < result_path_length)) {
 				result_length = length;
 				result_path_length = path_length;
 				result_actions.clear();
 			}
-			//if (length == result_length) {
-			if (length == result_length && path_length == result_path_length) {
+			if (length == result_length) {
+			//if (length == result_length && path_length == result_path_length) {
 				//Action planning_agent_action = original_joint_actions.at(0).get_action(planning_agent);
 				Action planning_agent_action = action;
 				result_actions.push_back(planning_agent_action);
