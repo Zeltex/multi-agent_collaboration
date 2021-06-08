@@ -426,7 +426,7 @@ std::map<Goals, float> Planner_Mac::calculate_goal_values(std::vector<Collaborat
 	return goal_values;
 }
 
-constexpr size_t action_trace_length = 4;
+constexpr size_t action_trace_length = 3;
 bool Planner_Mac::is_conflict_in_permutation(const State& initial_state, const std::vector<Joint_Action>& actions) {
 
 
