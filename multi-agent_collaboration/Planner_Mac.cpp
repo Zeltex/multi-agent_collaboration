@@ -154,14 +154,12 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 				}
 			}
 			if (best_length != HIGH_INIT_VAL) {
-				if (best_length < result_length) {
-				//if (best_length < result_length || (best_length == result_length && best_path_length < result_path_length)) {
+				if (best_length < result_length || (best_length == result_length && best_path_length < result_path_length)) {
 					result_length = best_length;
 					result_path_length = best_path_length;
 					result_actions.clear();
 				}
-				if (best_length == result_length) {
-				//if (best_length == result_length && best_path_length == result_path_length) {
+				if (best_length == result_length && best_path_length == result_path_length) {
 					result_actions.push_back(best_collaboration.next_action);
 				}
 			}
@@ -170,14 +168,12 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 		} else {
 			size_t path_length = paths.get_handoff(info.chosen_goal).value()->size();
 
-			if (length < result_length) {
-			//if (length < result_length || (length == result_length && path_length < result_path_length)) {
+			if (length < result_length || (length == result_length && path_length < result_path_length)) {
 				result_length = length;
 				result_path_length = path_length;
 				result_actions.clear();
 			}
-			if (length == result_length) {
-			//if (length == result_length && path_length == result_path_length) {
+			if (length == result_length && path_length == result_path_length) {
 				//Action planning_agent_action = original_joint_actions.at(0).get_action(planning_agent);
 				Action planning_agent_action = action;
 				result_actions.push_back(planning_agent_action);
@@ -430,7 +426,7 @@ std::map<Goals, float> Planner_Mac::calculate_goal_values(std::vector<Collaborat
 	return goal_values;
 }
 
-constexpr size_t action_trace_length = 3;
+constexpr size_t action_trace_length = 4;
 bool Planner_Mac::is_conflict_in_permutation(const State& initial_state, const std::vector<Joint_Action>& actions) {
 
 
@@ -976,24 +972,54 @@ Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collabo
 	//for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
 	//	assignments[agent] = EMPTY_VAL;
 	//}
-	// 
+	
+
+	std::vector<std::vector<Collaboration_Info>> sorted_infos;
+	for (const auto& info : probable_infos) {
+		while (sorted_infos.size() < info.goals_size()) {
+			sorted_infos.emplace_back();
+		}
+		sorted_infos.at(info.goals_size() - 1).push_back(info);
+	}
 	// Probable
 	Agent_Combination used_agents;
 	auto ingredients = state.get_ingredients_count();
-	for (const auto& info : probable_infos) {
-		auto new_agents = used_agents.get_new_agents(info.get_agents());
-		if (new_agents.empty()) {
-			continue;
-		}
-		auto recipes = info.get_goals().get_recipes();
-		if (!ingredients.have_ingredients(recipes, environment)) {
-			continue;
-		}
+	for (auto infos_entry = sorted_infos.rbegin(); infos_entry != sorted_infos.rend(); ++infos_entry) {
+		for (const auto& info : *infos_entry) {
+			auto new_agents = used_agents.get_new_agents(info.get_agents());
+			if (new_agents.empty()) {
+				continue;
+			}
+			auto recipes = info.get_goals().get_recipes();
+			if (!ingredients.have_ingredients(recipes, environment)) {
+				continue;
+			}
 
-		ingredients.perform_recipes(recipes, environment);
-		used_agents.add(new_agents);
-		if (info.get_agents().contains(planning_agent)) return info;
+			ingredients.perform_recipes(recipes, environment);
+			used_agents.add(new_agents);
+			if (info.get_agents().contains(planning_agent)) return info;
+		}
 	}
+
+
+
+	//// Probable
+	//Agent_Combination used_agents;
+	//auto ingredients = state.get_ingredients_count();
+	//for (const auto& info : probable_infos) {
+	//	auto new_agents = used_agents.get_new_agents(info.get_agents());
+	//	if (new_agents.empty()) {
+	//		continue;
+	//	}
+	//	auto recipes = info.get_goals().get_recipes();
+	//	if (!ingredients.have_ingredients(recipes, environment)) {
+	//		continue;
+	//	}
+
+	//	ingredients.perform_recipes(recipes, environment);
+	//	used_agents.add(new_agents);
+	//	if (info.get_agents().contains(planning_agent)) return info;
+	//}
 
 	// Improbable
 	for (const auto& info : infos) {
