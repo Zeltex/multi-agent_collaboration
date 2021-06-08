@@ -209,8 +209,10 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths,
 		size_t agent_size = agents.size();
 
 		// Iterate setups for agent_combination
-		for (size_t recipe_combination_index = 0; recipe_combination_index < agent_size
-			&& recipe_combination_index < recipe_in_size; ++recipe_combination_index) {
+		for (size_t recipe_combination_index = 0; 
+			//recipe_combination_index < agent_size && recipe_combination_index < recipe_in_size; 
+			recipe_combination_index < 1;
+			++recipe_combination_index) {
 
 			for (const auto& recipes : all_recipe_combinations.at(recipe_combination_index)) {
 				size_t recipes_size = recipes.size();
@@ -973,32 +975,23 @@ Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collabo
 	//	assignments[agent] = EMPTY_VAL;
 	//}
 	
-
-	std::vector<std::vector<Collaboration_Info>> sorted_infos;
-	for (const auto& info : probable_infos) {
-		while (sorted_infos.size() < info.goals_size()) {
-			sorted_infos.emplace_back();
-		}
-		sorted_infos.at(info.goals_size() - 1).push_back(info);
-	}
 	// Probable
 	Agent_Combination used_agents;
 	auto ingredients = state.get_ingredients_count();
-	for (auto infos_entry = sorted_infos.rbegin(); infos_entry != sorted_infos.rend(); ++infos_entry) {
-		for (const auto& info : *infos_entry) {
-			auto new_agents = used_agents.get_new_agents(info.get_agents());
-			if (new_agents.empty()) {
-				continue;
-			}
-			auto recipes = info.get_goals().get_recipes();
-			if (!ingredients.have_ingredients(recipes, environment)) {
-				continue;
-			}
-
-			ingredients.perform_recipes(recipes, environment);
-			used_agents.add(new_agents);
-			if (info.get_agents().contains(planning_agent)) return info;
+	for (const auto& info : probable_infos) {
+		auto new_agents = used_agents.get_new_agents(info.get_agents());
+		if (new_agents.empty()) {
+			continue;
 		}
+		auto recipes = info.get_goals().get_recipes();
+		if (!ingredients.have_ingredients(recipes, environment)) {
+			continue;
+		}
+
+		ingredients.perform_recipes(recipes, environment);
+		used_agents.add(new_agents);
+		if (info.get_agents().contains(planning_agent)) return info;
+
 	}
 
 
