@@ -60,6 +60,7 @@ float Sliding_Recogniser::update_standard_probabilities(size_t base_window_index
 			//val.probability = (alpha * 1.0f / val.lengths.at(window_index))
 			auto progress_prob = ((float)val.lengths.at(window_index)) / (val.lengths.at(time_step - 1) + window_length);
 			progress_prob = std::pow(progress_prob, 1 + (key.agents.size() - 1) * 0.5);
+			progress_prob = std::max(std::min(progress_prob, 1.0f), 0.0f);
 
 			if (window_length == 0) {
 				constexpr float new_goal_penalty = 0.8f;

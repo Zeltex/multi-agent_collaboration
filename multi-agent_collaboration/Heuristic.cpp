@@ -143,7 +143,6 @@ Helper_Agent_Distance Heuristic::get_helper_agents_distance(Coordinate source, C
 
 		auto next = prev_dist.parent;
 
-		++path_length;
 		if (environment.is_cell_type(next, Cell_Type::WALL)) {
 			auto helper = find_helper(helpers, handoff_agent, local_agents, first, state, prev, next, path_length);
 			if (!helper.has_value()) {
@@ -154,6 +153,7 @@ Helper_Agent_Distance Heuristic::get_helper_agents_distance(Coordinate source, C
 
 			first = false;
 		}
+		++path_length;
 		prev = next;
 	}
 

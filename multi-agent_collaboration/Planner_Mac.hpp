@@ -15,7 +15,7 @@
 struct Action_Path {
 	Action_Path(std::vector<Joint_Action> joint_actions,
 		const Goal goal,
-		const State& state,
+		const State& state_in,
 		const Environment& environment)
 		: joint_actions(joint_actions), recipe(goal.recipe), agents(goal.agents),
 		handoff_agent(goal.handoff_agent),
@@ -26,7 +26,7 @@ struct Action_Path {
 		if (joint_actions.empty() || handoff_agent == EMPTY_VAL) {
 			return;
 		}
-		auto initial_coordinate = state.get_agent(handoff_agent).coordinate;
+		auto initial_coordinate = state_in.get_agent(handoff_agent).coordinate;
 		
 		// Stop at first action which interacts with a wall
 		first_action = 0;
@@ -37,8 +37,8 @@ struct Action_Path {
 
 			// New useful definition
 			if (environment.is_cell_type(coordinate_noclip, Cell_Type::WALL)) {
-				auto item = state.get_ingredient_at_position(coordinate_noclip);
-				auto agent_item = state.get_agent(handoff_agent).item;
+				auto item = state_in.get_ingredient_at_position(coordinate_noclip);
+				auto agent_item = state_in.get_agent(handoff_agent).item;
 				if (item.has_value()
 					&& (item.value() == goal.recipe.ingredient1
 						|| item.value() == goal.recipe.ingredient2)) {
@@ -66,7 +66,10 @@ struct Action_Path {
 		coordinate = initial_coordinate;
 		last_action = EMPTY_VAL;
 		size_t action_counter = 0;
+		auto state = state_in;
 		while (action_counter < joint_actions.size()) {
+			bool result = environment.act(state, joint_actions.at(action_counter));
+			assert(result);
 			const auto& direction = joint_actions.at(action_counter).get_action(handoff_agent).direction;
 
 			// New useful definition

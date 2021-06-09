@@ -210,8 +210,8 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_infos(const Paths& paths,
 
 		// Iterate setups for agent_combination
 		for (size_t recipe_combination_index = 0; 
-			//recipe_combination_index < agent_size && recipe_combination_index < recipe_in_size; 
-			recipe_combination_index < 1;
+			recipe_combination_index < agent_size && recipe_combination_index < recipe_in_size; 
+			//recipe_combination_index < 1;
 			++recipe_combination_index) {
 
 			for (const auto& recipes : all_recipe_combinations.at(recipe_combination_index)) {
