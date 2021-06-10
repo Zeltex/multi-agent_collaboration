@@ -191,6 +191,7 @@ Node* A_Star::check_and_perform(Search_Info& si, const Joint_Action& action,
 
 	if (handoff_agent.is_not_empty() && action.get_action(handoff_agent).is_not_none()) {
 		new_node->handoff_first_action = std::min(new_node->g, new_node->handoff_first_action);
+		//new_node->pass_time = new_node->g;
 	}
 
 	new_node->calculate_hash();
@@ -241,6 +242,7 @@ Search_Info A_Star::initialize_variables(Recipe& recipe, const State& original_s
 	constexpr bool can_pass = false;
 	bool require_handoff = false;
 	size_t pass_time = EMPTY_VAL;
+	//size_t pass_time = 0;
 	Joint_Action action;
 	size_t h = 0;
 	h = heuristic(original_state, agents, handoff_agent);
