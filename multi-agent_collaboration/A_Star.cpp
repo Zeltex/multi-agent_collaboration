@@ -6,7 +6,7 @@
 
 
 A_Star::A_Star(const Environment& environment, size_t depth_limit) 
-	: Search_Method(environment, depth_limit), heuristic(environment) {
+	: Search_Method(environment, depth_limit), dist_heuristic(environment), heuristic(environment) {
 }
 /**
 original_state	Initial state to search from
@@ -68,7 +68,7 @@ std::vector<Joint_Action> A_Star::search_joint(const State& original_state,
 }
 
 std::pair<size_t, Direction> A_Star::get_dist_direction(Coordinate source, Coordinate dest, size_t walls) {
-	return heuristic.get_dist_direction(source, dest, walls);
+	return dist_heuristic.get_dist_direction(source, dest, walls);
 }
 
 bool A_Star::process_node(Search_Info& si, Node* node, const Joint_Action& action) const {

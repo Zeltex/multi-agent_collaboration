@@ -178,6 +178,47 @@ struct Search_Info {
 	Agent_Combination agents;
 };
 
+class Manhattan_Heuristic {
+public:
+	Manhattan_Heuristic(const Environment& environment) : environment(environment),
+		ingredient1(Ingredient::DELIVERY), ingredient2(Ingredient::DELIVERY) { }
+
+	size_t operator()(const State& state, const Agent_Combination& agents, const Agent_Id& handoff_agent) const {
+		bool require_handoff_action = false;
+		std::vector<Location> locations1;
+		locations1 = environment.get_locations(state, ingredient1);
+		if (environment.is_type_stationary(ingredient1)) {
+		} else {
+			locations1 = environment.get_non_wall_locations(state, ingredient1);
+		}
+		auto locations2 = environment.get_non_wall_locations(state, ingredient2);
+
+		size_t min_dist = EMPTY_VAL;
+		size_t number_of_agents = environment.get_number_of_agents();
+
+		// Search all location combinations using all agents, and all agents minus handoff_agent
+		for (const auto& location1 : locations1) {
+			for (const auto& location2 : locations2) {
+				auto first = (size_t) std::abs((int)location1.coordinate.first - (int)location2.coordinate.first);
+				auto second = (size_t) std::abs((int)location1.coordinate.second - (int)location2.coordinate.second);
+				min_dist = std::min(min_dist, first + second);
+			}
+		}
+		return min_dist;
+	}
+
+	void set(Ingredient ingredient1, Ingredient ingredient2, const Agent_Combination& agents,
+		const Agent_Id& handoff_agent) {
+
+		this->ingredient1 = ingredient1;
+		this->ingredient2 = ingredient2;
+	}
+
+	Environment environment;
+	Ingredient ingredient1;
+	Ingredient ingredient2;
+};
+
 
 class A_Star : public Search_Method {
 public:
@@ -214,5 +255,6 @@ private:
 
 
 
-	Heuristic heuristic;
+	Heuristic dist_heuristic; 
+	Manhattan_Heuristic heuristic;
 };
