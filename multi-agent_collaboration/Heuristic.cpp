@@ -356,7 +356,7 @@ void Heuristic::init() {
 		}
 	}
 
-	print_distances({ 5,5 }, 2);
-	print_distances({ 1,1 }, 2);
+	//print_distances({ 5,5 }, 2);
+	//print_distances({ 1,1 }, 2);
 	//print_distances({ 5,0 }, 2);
 }

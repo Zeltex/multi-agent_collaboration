@@ -63,6 +63,7 @@ Action Planner_Mac::get_next_action(const State& state, bool print_state) {
 		&& info.chosen_goal.has_value()
 		&& info.next_action.is_not_none()) {
 		result_action = get_random_good_action(info, paths, state);
+		//result_action = info.next_action;
 	}
 
 	if (info.has_value()) {
@@ -90,6 +91,7 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 	std::vector<Action> result_actions;
 	size_t result_length = HIGH_INIT_VAL;
 	size_t result_path_length = HIGH_INIT_VAL;
+	size_t result_handoff = HIGH_INIT_VAL;
 	//size_t original_path_length = paths_in.get_handoff(info.chosen_goal).value()->size();
 
 	for (const auto& action : environment.get_actions(planning_agent)) {
@@ -118,6 +120,7 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 			// Perform collision avoidance search
 			size_t best_length = HIGH_INIT_VAL;
 			size_t best_path_length = HIGH_INIT_VAL;
+			size_t best_handoff = HIGH_INIT_VAL;
 			Collaboration_Info best_collaboration;
 			for (const auto& goal : goals) {
 
@@ -138,9 +141,12 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 				// Get info using the new search
 				size_t new_length = get_permutation_length(goals, new_paths);
 				size_t path_length = new_paths.get_handoff(info.chosen_goal).value()->size();
+				size_t new_handoff = new_paths.get_handoff(info.chosen_goal).value()->last_action;
 
 				// Check if best collision avoidance search so far
-				if (new_length < best_length || (new_length == best_length && path_length < best_path_length)) {
+				if (new_length < best_length 
+					|| (new_length == best_length && path_length < best_path_length)
+					|| (new_length == best_length && path_length == result_path_length && new_handoff < best_handoff && best_handoff != EMPTY_VAL)) {
 					auto [joint_actions, goal_agents] = get_actions_from_permutation(goals, new_paths, state);
 
 					if (!is_conflict_in_permutation(state, joint_actions)) {
@@ -148,18 +154,22 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 						Action planning_agent_action = action;
 						best_length = new_length;
 						best_path_length = path_length;
+						best_handoff = new_handoff;
 						auto chosen_goal = goal_agents.get_chosen_goal();
 						best_collaboration = { new_length, goals, planning_agent_action,  chosen_goal, new_paths.get_handoff(chosen_goal).value()->size()};
 					}
 				}
 			}
 			if (best_length != HIGH_INIT_VAL) {
-				if (best_length < result_length || (best_length == result_length && best_path_length < result_path_length)) {
+				if (best_length < result_length 
+					|| (best_length == result_length && best_path_length < result_path_length)
+					|| (best_length == result_length && best_path_length == result_path_length && best_handoff < result_handoff && result_handoff != EMPTY_VAL)) {
 					result_length = best_length;
 					result_path_length = best_path_length;
+					result_handoff = best_handoff;
 					result_actions.clear();
 				}
-				if (best_length == result_length && best_path_length == result_path_length) {
+				if (best_length == result_length && best_path_length == result_path_length && best_handoff == result_handoff) {
 					result_actions.push_back(best_collaboration.next_action);
 				}
 			}
@@ -167,13 +177,17 @@ Action Planner_Mac::get_random_good_action(const Collaboration_Info& info, const
 			// Return unmodified entry
 		} else {
 			size_t path_length = paths.get_handoff(info.chosen_goal).value()->size();
+			size_t handoff = paths.get_handoff(info.chosen_goal).value()->last_action;
 
-			if (length < result_length || (length == result_length && path_length < result_path_length)) {
+			if (length < result_length 
+				|| (length == result_length && path_length < result_path_length)
+				|| (length == result_length && path_length == result_path_length && handoff < result_handoff && result_handoff != EMPTY_VAL)) {
 				result_length = length;
 				result_path_length = path_length;
+				result_handoff = handoff;
 				result_actions.clear();
 			}
-			if (length == result_length && path_length == result_path_length) {
+			if (length == result_length && path_length == result_path_length && handoff == result_handoff) {
 				//Action planning_agent_action = original_joint_actions.at(0).get_action(planning_agent);
 				Action planning_agent_action = action;
 				result_actions.push_back(planning_agent_action);
@@ -756,7 +770,7 @@ size_t Planner_Mac::get_permutation_length(const Goals& goals, const Paths& path
 		}
 
 		auto& handoff_ref = handoffs.at(lowest_index);
-		handoff_ref = std::max(handoff_ref + task.extra_length, task.total_length);
+		handoff_ref = std::max(handoff_ref + task.extra_length + 1, task.total_length);
 	}
 
 	// Find max completion time
