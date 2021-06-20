@@ -1044,52 +1044,52 @@ Collaboration_Info Planner_Mac::get_best_collaboration(const std::vector<Collabo
 		auto recipes = info.get_goals().get_recipes();
 		auto& agents = info.get_agents();
 		if (ingredients.have_ingredients(recipes, environment)) {
+			return info;
+			//// Check if contains relevant goal
+			//Goal chosen_goal;
+			//if (agents.is_only_agent(planning_agent)) {
+			//	chosen_goal = *info.get_goals().begin();
+			//} else {
+			//	for (const auto& goal : info.get_goals()) {
+			//		if (goal.handoff_agent == planning_agent) {
+			//			chosen_goal = goal;
+			//			break;
+			//		}
+			//	}
+			//}
 
-			// Check if contains relevant goal
-			Goal chosen_goal;
-			if (agents.is_only_agent(planning_agent)) {
-				chosen_goal = *info.get_goals().begin();
-			} else {
-				for (const auto& goal : info.get_goals()) {
-					if (goal.handoff_agent == planning_agent) {
-						chosen_goal = goal;
-						break;
-					}
-				}
-			}
+			//// If goal found, find direction to reduce distance to nearest ingredient
+			//if (chosen_goal.has_value()) {
+			//	Action best_action;
+			//	size_t best_dist = EMPTY_VAL;
+			//	Coordinate agent_location = state.get_agent(planning_agent).coordinate;
+			//	size_t walls_penetrated = 0;
 
-			// If goal found, find direction to reduce distance to nearest ingredient
-			if (chosen_goal.has_value()) {
-				Action best_action;
-				size_t best_dist = EMPTY_VAL;
-				Coordinate agent_location = state.get_agent(planning_agent).coordinate;
-				size_t walls_penetrated = 0;
-
-				// Find best direction, ingredient 1
-				if (!environment.is_type_stationary(chosen_goal.recipe.ingredient1)) {
-					for (const auto& ingredient_location : environment.get_non_wall_locations(state, chosen_goal.recipe.ingredient1)) {
-						auto [dist, direction] = search.get_dist_direction(agent_location, ingredient_location.coordinate, walls_penetrated);
-						if (dist < best_dist || best_dist == EMPTY_VAL) {
-							best_dist = dist;
-							best_action = { direction, planning_agent };
-						}
-					}
-				}
-				// Find best direction, ingredient 2
-				for (const auto& ingredient_location : environment.get_non_wall_locations(state, chosen_goal.recipe.ingredient2)) {
-					auto [dist, direction] = search.get_dist_direction(agent_location, ingredient_location.coordinate, walls_penetrated);
-					if (dist < best_dist || best_dist == EMPTY_VAL) {
-						best_dist = dist;
-						best_action = { direction, planning_agent };
-					}
-				}
-				// Return best
-				if (best_dist != EMPTY_VAL) {
-					auto info_copy = info;
-					info_copy.next_action = best_action;
-					return info_copy;
-				}
-			}
+			//	// Find best direction, ingredient 1
+			//	if (!environment.is_type_stationary(chosen_goal.recipe.ingredient1)) {
+			//		for (const auto& ingredient_location : environment.get_non_wall_locations(state, chosen_goal.recipe.ingredient1)) {
+			//			auto [dist, direction] = search.get_dist_direction(agent_location, ingredient_location.coordinate, walls_penetrated);
+			//			if (dist < best_dist || best_dist == EMPTY_VAL) {
+			//				best_dist = dist;
+			//				best_action = { direction, planning_agent };
+			//			}
+			//		}
+			//	}
+			//	// Find best direction, ingredient 2
+			//	for (const auto& ingredient_location : environment.get_non_wall_locations(state, chosen_goal.recipe.ingredient2)) {
+			//		auto [dist, direction] = search.get_dist_direction(agent_location, ingredient_location.coordinate, walls_penetrated);
+			//		if (dist < best_dist || best_dist == EMPTY_VAL) {
+			//			best_dist = dist;
+			//			best_action = { direction, planning_agent };
+			//		}
+			//	}
+			//	// Return best
+			//	if (best_dist != EMPTY_VAL) {
+			//		auto info_copy = info;
+			//		info_copy.next_action = best_action;
+			//		return info_copy;
+			//	}
+			//}
 		}
 	}
 
