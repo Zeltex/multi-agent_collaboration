@@ -325,23 +325,23 @@ std::vector<Collaboration_Info> Planner_Mac::calculate_probable_multi_goals(cons
 
 		if (info_entry.agents_size() > 1) {
 
-			// If collaborating on multiple tasks, check if all tasks could be done faster seperately
-			if (info_entry.goals_size() > 1) {
-				bool task_faster_coop = false;
-				for (const auto& goal : info_entry.get_goals_iterable()) {
+			//// If collaborating on multiple tasks, check if all tasks could be done faster seperately
+			//if (info_entry.goals_size() > 1) {
+			//	bool task_faster_coop = false;
+			//	for (const auto& goal : info_entry.get_goals_iterable()) {
 
 
-					Goals goals_reduced_agents(goal);
-					goals_reduced_agents.clear_all_handoff_indices();
+			//		Goals goals_reduced_agents(goal);
+			//		goals_reduced_agents.clear_all_handoff_indices();
 
-					auto it_seperate = goal_values.find(goals_reduced_agents);
-					//assert(it_seperate != goal_values.end());
-					if (it_seperate->second > info_entry.value) {
-						task_faster_coop = true;
-					}
-				}
-				is_probable &= task_faster_coop;
-			}
+			//		auto it_seperate = goal_values.find(goals_reduced_agents);
+			//		//assert(it_seperate != goal_values.end());
+			//		if (it_seperate->second > info_entry.value) {
+			//			task_faster_coop = true;
+			//		}
+			//	}
+			//	is_probable &= task_faster_coop;
+			//}
 			
 			if (is_agent_subset_faster(info_entry, goal_values)) {
 				is_probable = false;
