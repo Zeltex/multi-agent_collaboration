@@ -135,7 +135,8 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 					for (const auto& handoff_agent : possible_handoff_agents) {
 						auto it = goals.find(Goal(Agent_Combination{ permutation }, key.recipe, handoff_agent));
 						//if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
-						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob * delta) {
+						//if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob * delta) {
+						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability > agent_prob) {
 							is_useful = false;
 							break;
 						}
