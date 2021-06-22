@@ -6,7 +6,7 @@
 #include <sstream>
 #include <iomanip>
 
-constexpr auto WINDOW_SIZE = 4; 
+constexpr auto WINDOW_SIZE = 3; 
 constexpr auto alpha = 100.0f;			// Inverse weight of solution length in goal probability
 constexpr auto beta = 0.9f;				// Adjust NONE probability scale
 constexpr auto charlie = 0.8;			// Threshold for goal being probable
@@ -134,9 +134,7 @@ float Sliding_Recogniser::update_non_probabilities(size_t base_window_index, siz
 					possible_handoff_agents.push_back(EMPTY_VAL);
 					for (const auto& handoff_agent : possible_handoff_agents) {
 						auto it = goals.find(Goal(Agent_Combination{ permutation }, key.recipe, handoff_agent));
-						//if (it != goals.end() && it->second.is_current(time_step) && it->second.probability * delta >= agent_prob) {
-						//if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob * delta) {
-						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability > agent_prob) {
+						if (it != goals.end() && it->second.is_current(time_step) && it->second.probability >= agent_prob * delta) {
 							is_useful = false;
 							break;
 						}
