@@ -6,7 +6,7 @@
 #include <sstream>
 #include <iomanip>
 
-constexpr auto WINDOW_SIZE = 3; 
+constexpr auto WINDOW_SIZE = 4; 
 constexpr auto alpha = 100.0f;			// Inverse weight of solution length in goal probability
 constexpr auto beta = 0.9f;				// Adjust NONE probability scale
 constexpr auto charlie = 0.8;			// Threshold for goal being probable

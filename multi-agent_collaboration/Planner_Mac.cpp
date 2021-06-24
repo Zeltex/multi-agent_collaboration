@@ -904,7 +904,10 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 					auto [joint_actions, goal_agents] = get_actions_from_permutation(goals, new_paths, state);
 
 					if (!is_conflict_in_permutation(state, joint_actions)) {
-						Action planning_agent_action = joint_actions.at(0).get_action(planning_agent);
+						Action planning_agent_action{};
+						if (goals_in.get_agents().contains(planning_agent)) {
+							planning_agent_action = joint_actions.at(0).get_action(planning_agent);
+						}
 						best_length = new_length;
 						auto chosen_goal = goal_agents.get_chosen_goal();
 						size_t path_length = EMPTY_VAL;
@@ -921,7 +924,10 @@ std::vector<Collaboration_Info> Planner_Mac::get_collaboration_permutations(cons
 
 		// Return unmodified entry
 		} else {
-			Action planning_agent_action = original_joint_actions.at(0).get_action(planning_agent);
+			Action planning_agent_action{};
+			if (goals_in.get_agents().contains(planning_agent)) {
+				planning_agent_action = original_joint_actions.at(0).get_action(planning_agent);
+			}
 			auto chosen_goal = goal_agents.get_chosen_goal();
 			auto path_length = EMPTY_VAL;
 			if (chosen_goal.has_value()) {
