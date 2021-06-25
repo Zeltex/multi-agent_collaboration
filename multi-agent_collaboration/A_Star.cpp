@@ -123,9 +123,11 @@ bool A_Star::action_conforms_to_input(const Node* current_node, const std::vecto
 
 	if (current_node->g < input_action_size) {
 		auto& action_ref = input_actions.at(current_node->g);
-		for (size_t action_index = 0; action_index < action_ref.actions.size(); ++action_index) {
-			if (!free_agents.contains({ action_index })
-				&& action_ref.get_action({ action_index }) != action.get_action({ action_index })) {
+		//for (size_t action_index = 0; action_index < action_ref.actions.size(); ++action_index) {
+		for (const auto& input_action : action_ref.actions) {
+			//if (!free_agents.contains({ action_index })
+			if (!free_agents.contains(input_action.agent)
+				&& input_action != action.get_action(input_action.agent)) {
 				return false;
 			}
 		}

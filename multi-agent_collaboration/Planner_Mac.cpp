@@ -959,11 +959,11 @@ void Planner_Mac::trim_trailing_non_actions(std::vector<Joint_Action>& joint_act
 	--action_it;
 	while (true) {
 		bool valid_action = false;
-		for (size_t j = 0; j < (*action_it).size(); ++j) {
-			if (j == handoff_agent.id) {
+		for (const auto& action : action_it->actions){
+			if (action.agent == handoff_agent.id) {
 				continue;
 			}
-			if (action_it->get_action(j).is_not_none()) {
+			if (action.is_not_none()) {
 				valid_action = true;
 				break;
 			}
