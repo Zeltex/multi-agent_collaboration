@@ -86,7 +86,10 @@ PyObject* mac_init(PyObject*, PyObject* o) {
     environment = Environment(agent_size);
     state = environment.load(file_name);
 
-    planner = Planner_Mac(environment, agent_id, state);
+
+    size_t seed = PyLong_AsLong(PyDict_GetItemString(o, "seed"));
+
+    planner = Planner_Mac(environment, agent_id, state, seed);
     std::cout << "mac_init finished" << std::endl;
     return PyLong_FromLong(2);
 }
