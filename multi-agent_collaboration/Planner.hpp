@@ -4,6 +4,7 @@
 
 enum class Planner_Types {
 	MAC='m',
+	MAC_ONE='n',
 	STILL='s'
 };
 

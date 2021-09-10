@@ -18,7 +18,7 @@ enum class Print_Category {
 };
 
 #ifndef PRINT_LEVEL
-#define PRINT_LEVEL Print_Level::DEBUG
+#define PRINT_LEVEL Print_Level::INFO
 #endif
 
 bool is_print_allowed(Print_Level level);

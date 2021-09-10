@@ -2,6 +2,7 @@
 #include "Environment.hpp"
 #include "Planner.hpp"
 #include "Planner_Mac.hpp"
+#include "Planner_Mac_One.hpp"
 #include "Planner_Still.hpp"
 #include "State.hpp"
 
@@ -30,10 +31,11 @@ struct Solution {
 	std::string path;
 	Planner_Types planner1;
 	Planner_Types planner2;
+	size_t seed;
 };
 
 
-Solution solve_inner(const std::string& path, const std::vector<Planner_Types>& planner_types) {
+Solution solve_inner(const std::string& path, const std::vector<Planner_Types>& planner_types, size_t seed) {
 	auto environment = Environment(2);
 	auto state = environment.load(path);
 	size_t action_count = 0;
@@ -42,7 +44,11 @@ Solution solve_inner(const std::string& path, const std::vector<Planner_Types>& 
 	for (size_t agent = 0; agent < environment.get_number_of_agents(); ++agent) {
 		switch (planner_types.at(agent)) {
 		case Planner_Types::MAC: {
-			planners.emplace_back(std::make_unique<Planner_Mac>(environment, agent, state));
+			planners.emplace_back(std::make_unique<Planner_Mac>(environment, agent, state, seed));
+			break;
+		}
+		case Planner_Types::MAC_ONE: {
+			planners.emplace_back(std::make_unique<Planner_Mac_One>(environment, agent, state, seed));
 			break;
 		}
 		case Planner_Types::STILL: {
@@ -72,7 +78,7 @@ Solution solve_inner(const std::string& path, const std::vector<Planner_Types>& 
 	auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
 	std::cout << "Total time: " << diff << std::endl;
 	std::cout << "Actions: " << action_count << std::endl;
-	return Solution{ diff, action_count, path, planner_types.at(0), planner_types.at(1) };
+	return Solution{ diff, action_count, path, planner_types.at(0), planner_types.at(1), seed };
 }
 
 
@@ -94,8 +100,58 @@ std::string trim_path(const std::string& path_in) {
 std::string planner_to_string(Planner_Types type) {
 	switch (type) {
 	case Planner_Types::MAC: return "mac";
+	case Planner_Types::MAC_ONE: return "mac1";
 	case Planner_Types::STILL: return "still";
 	}
+}
+
+void write_solutions(const std::vector<Solution>& solutions) {
+	size_t sum = 0;
+	size_t count = 0;
+	size_t sum_solved = 0;
+	size_t count_solved = 0;
+	std::stringstream buffer;
+	float mac_solutions = 0.0f;
+	for (const auto& solution : solutions) {
+
+		size_t length = solution.actions;
+		if (length != 100 && length != 0) {
+			sum_solved += length;
+			++count_solved;
+		}
+		sum += length;
+		++count;
+		std::cout
+			<< solution.actions
+			<< "\t"
+			<< solution.time
+			<< "\t"
+			<< static_cast<char>(solution.planner1)
+			<< "\t"
+			<< static_cast<char>(solution.planner2)
+			<< "\t"
+			<< solution.path
+			<< std::endl;
+
+		buffer << trim_path(solution.path) << ";"
+			<< planner_to_string(solution.planner1) << ';'
+			<< planner_to_string(solution.planner2) << ';'
+			<< solution.seed << ';'
+			<< solution.actions << ';'
+			<< solution.time << '\n';
+
+		if (solution.planner1 == Planner_Types::MAC && solution.planner2 == Planner_Types::MAC) {
+			mac_solutions += solution.actions;
+		}
+	}
+	mac_solutions /= 9;
+	std::cout << "mac-mac avg = " << mac_solutions << std::endl;
+	std::cout << count << " total, avg = " << ((1.0f + sum) / count) << std::endl;
+	std::cout << count_solved << " solved, avg = " << ((1.0f + sum_solved) / count_solved) << std::endl;
+	std::cout << " - " << std::endl;
+	auto file = std::ofstream("../results/result.txt");
+	file << buffer.str();
+	file.close();
 }
 
 void solve() {
@@ -103,13 +159,16 @@ void solve() {
 
 
 	bool run_single = false;
+	//bool run_single = true;
+
 
 	if (run_single) {
 		std::vector<Planner_Types> planner_types{
-			//Planner_Types::STILL,
+			Planner_Types::STILL,
+			//Planner_Types::MAC_ONE,
 			Planner_Types::MAC,
 			//Planner_Types::MAC,
-			Planner_Types::STILL,
+			//Planner_Types::STILL,
 		};
 		//std::vector<std::string> paths{ "../levels/BD/full-divider_salad.txt" };
 		//std::vector<std::string> paths{ "../levels/BD/full-divider_tl.txt" };
@@ -124,8 +183,17 @@ void solve() {
 		//std::vector<std::string> paths{ "../levels/Test_Scenarios/L2.txt" };
 		//std::vector<std::string> paths{ "../levels/Test_Scenarios/L3.txt" };
 		//std::vector<std::string> paths{ "../levels/Test_Scenarios/L4.txt" };
-		solve_inner(paths.at(0), planner_types);
+		size_t seed = 0;			
+		bool triple = true;
+		Planner_Types triple_type = Planner_Types::MAC;
+		if (triple) {
+			solve_inner(paths.at(0), { triple_type, triple_type, triple_type }, seed);
+		} else {
+			solve_inner(paths.at(0), planner_types, seed);
+		}
+		//std::cin.get();
 	} else {
+		bool self_play = true;
 		auto paths = get_all_files("../levels/BD/");
 		std::vector<Solution> solutions;
 
@@ -133,56 +201,34 @@ void solve() {
 			//Planner_Types::STILL,
 			//Planner_Types::MAC,
 			Planner_Types::MAC,
+			Planner_Types::MAC_ONE,
 			Planner_Types::STILL,
 		};
 
-		for (const auto& planner1 : planner_types) {
-			for (const auto& planner2 : planner_types) {
+		bool triple = true;
+		Planner_Types triple_type = Planner_Types::MAC;
+		for (size_t seed = 0; seed < 1; ++seed) {
+			if (triple) {
 				for (const auto& path : paths) {
-					solutions.push_back(solve_inner(path, { planner1, planner2 }));
+					solutions.push_back(solve_inner(path, { triple_type, triple_type, triple_type }, seed));
+					write_solutions(solutions);
+				}
+			} else {
+				for (const auto& planner1 : planner_types) {
+					for (const auto& planner2 : planner_types) {
+						//if (self_play && (planner1 != Planner_Types::MAC || planner2 != Planner_Types::MAC)) {
+						if (self_play && (planner1 != Planner_Types::MAC || planner2 != Planner_Types::MAC_ONE)
+							&& (planner1 != Planner_Types::MAC_ONE || planner2 != Planner_Types::MAC)) {
+							continue;
+						}
+						for (const auto& path : paths) {
+							solutions.push_back(solve_inner(path, { planner1, planner2 }, seed));
+						}
+					}
 				}
 			}
 		}
-		size_t sum = 0;
-		size_t count = 0;
-		size_t sum_solved = 0;
-		size_t count_solved = 0;
-		std::stringstream buffer;
-		for (const auto& solution : solutions) {
-			size_t length = solution.actions;
-			if (length != 100 && length != 0) {
-				sum_solved += length;
-				++count_solved;
-			}
-			sum += length;
-			++count;
-			std::cout
-				<< solution.actions
-				<< "\t"
-				<< solution.time
-				<< "\t"
-				<< static_cast<char>(solution.planner1)
-				<< "\t"
-				<< static_cast<char>(solution.planner2)
-				<< "\t"
-				<< solution.path
-				<< std::endl;
-
-			size_t seed = 0;
-			buffer << trim_path(solution.path) << ";"
-				<< planner_to_string(solution.planner1) << ';'
-				<< planner_to_string(solution.planner2) << ';'
-				<< seed << ';'
-				<< solution.actions << ';'
-				<< solution.time << '\n';
-		}
-
-		std::cout << count << " total, avg = " << ((1.0f + sum) / count) << std::endl;
-		std::cout << count_solved << " solved, avg = " << ((1.0f + sum_solved) / count_solved) << std::endl;
-		std::cout << " - " << std::endl;
-		auto file = std::ofstream("../results/result.txt");
-		file << buffer.str();
-		file.close();
+		write_solutions(solutions);
 	}
 }
 
