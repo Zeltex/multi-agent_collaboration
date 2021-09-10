@@ -36,7 +36,9 @@ struct Solution {
 
 
 Solution solve_inner(const std::string& path, const std::vector<Planner_Types>& planner_types, size_t seed) {
-	auto environment = Environment(2);
+	constexpr size_t AGENT_COUNT = 2;
+
+	auto environment = Environment(AGENT_COUNT);
 	auto state = environment.load(path);
 	size_t action_count = 0;
 	auto time_start = std::chrono::system_clock::now();
@@ -110,8 +112,9 @@ void write_solutions(const std::vector<Solution>& solutions) {
 	size_t count = 0;
 	size_t sum_solved = 0;
 	size_t count_solved = 0;
+	size_t sum_mac = 0;
+	size_t count_mac = 0;
 	std::stringstream buffer;
-	float mac_solutions = 0.0f;
 	for (const auto& solution : solutions) {
 
 		size_t length = solution.actions;
@@ -141,13 +144,13 @@ void write_solutions(const std::vector<Solution>& solutions) {
 			<< solution.time << '\n';
 
 		if (solution.planner1 == Planner_Types::MAC && solution.planner2 == Planner_Types::MAC) {
-			mac_solutions += solution.actions;
+			sum_mac += solution.actions;
+			++count_mac;
 		}
 	}
-	mac_solutions /= 9;
-	std::cout << "mac-mac avg = " << mac_solutions << std::endl;
-	std::cout << count << " total, avg = " << ((1.0f + sum) / count) << std::endl;
-	std::cout << count_solved << " solved, avg = " << ((1.0f + sum_solved) / count_solved) << std::endl;
+	if (count_mac > 0) std::cout << "mac-mac avg = " << ((1.0f * sum_mac) / count_mac) << std::endl;
+	if (count > 0) std::cout << count << " total, avg = " << ((1.0f * sum) / count) << std::endl;
+	if (count_solved > 0) std::cout << count_solved << " solved, avg = " << ((1.0f * sum_solved) / count_solved) << std::endl;
 	std::cout << " - " << std::endl;
 	auto file = std::ofstream("../results/result.txt");
 	file << buffer.str();
