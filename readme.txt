@@ -7,3 +7,5 @@ If python is installed in another location, adjust in VS mac_interface->properti
 The gym_cooking and mac_interface projects must be run, respectively compiled, in x32
 
 Note that Planner_Mac_One is litterally a copy-pasta of Planner_Mac (with a single line changed in calculate_infos), and any changes to one agent will therefore not change the other.
+
+Note that the gym-cooking-fork submodule links to an old commit, so after pulling, one must maunally check out the master branch. 
